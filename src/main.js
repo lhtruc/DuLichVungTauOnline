@@ -23,7 +23,12 @@ quality.set(params.get('q') || (isTouch ? 'low' : 'high'));
 
 const setLoad = (f, txt) => { $('#loadbar i').style.width = Math.round(f * 100) + '%'; if (txt) $('#loadtxt').textContent = txt; };
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
-const bin = async (url, T) => new T(await (await fetch(url)).arrayBuffer());
+// Some static hosts refuse .bin files; the same bytes are then published under a .wasm name.
+const bin = async (url, T) => {
+  let r = await fetch(url).catch(() => null);
+  if (!r || !r.ok) r = await fetch(url.replace(/\.bin$/, '.wasm'));
+  return new T(await r.arrayBuffer());
+};
 
 async function boot() {
   setLoad(0.05, 'Đang tải bản đồ Vũng Tàu…');
@@ -105,10 +110,10 @@ async function boot() {
     cam() { leave(); rig.setMode(rig.mode === 'chase' ? 'first' : 'chase'); },
     fly() { leave(); rig.setMode(rig.mode === 'fly' ? 'chase' : 'fly'); document.querySelector('[data-act=fly]').classList.toggle('on', rig.mode === 'fly'); },
     time() { timeIdx = (timeIdx + 1) % TIMES.length; env.setHour(TIMES[timeIdx]); },
-    sv() { window.open(svUrl(), '_blank', 'noopener'); },
     stops() { $('#stops').hidden = !$('#stops').hidden; },
   };
   $('#btns').addEventListener('click', (e) => { const a = e.target.dataset.act; if (a) act[a](); });
+  for (const ev of ['pointerdown', 'mouseenter', 'focus']) $('#sv').addEventListener(ev, () => { $('#sv').href = svUrl(); });
   $('#stops').addEventListener('click', (e) => {
     const d = e.target.closest('[data-i]'); if (!d) return;
     const p = pois[+d.dataset.i]; leave(); rider.teleport(Math.max(5, p.s - 60), 1); rig.yaw = rider.heading; rig.yawOff = 0; $('#stops').hidden = true;
