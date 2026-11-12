@@ -15,6 +15,7 @@ import { buildBuildings } from './world/buildings.js';
 import { buildForest, buildRoadsideTrees } from './world/vegetation.js';
 import { buildLandmarks } from './world/landmarks.js';
 import { buildCoastalLife } from './world/traffic.js';
+import { buildSeafrontParks } from './world/parks.js';
 import { buildScooter } from './player/scooter.js';
 import { Rider } from './player/rider.js';
 import { CameraRig } from './player/camera.js';
@@ -76,8 +77,19 @@ async function boot() {
   scene.add(buildSea(terrain));
   setLoad(0.5, 'Đang trải nhựa đường Trần Phú → Thùy Vân...'); await nextFrame();
   scene.add(buildRouteRoad(route));
+  // points of interest: world position + nearest spot on the route
+  const pois = POIS.map((p) => {
+    let [x, z] = ll2xz(p.lat, p.lon);
+    const pr = route.project(x, z);
+    if (p.seafront) {  // landmark known to stand on the beach side of the road, `seafront` m from its centreline
+      const fr = route.at(pr.s);
+      x = fr.pos.x + fr.right.x * route.seaSide * p.seafront; z = fr.pos.z + fr.right.z * route.seaSide * p.seafront;
+    }
+    return { ...p, x, z, s: pr.s, y: terrain.heightAt(x, z) };
+  }).sort((a, b) => a.s - b.s);
+  const clear = pois.filter((p) => p.clear).map((p) => ({ x: p.x, z: p.z, r: p.clear }));
   setLoad(0.62, 'Đang xây ' + (bI16.length / 8).toLocaleString('vi') + ' ngôi nhà...'); await nextFrame();
-  scene.add(buildBuildings(bI16, world.bpolys, route));
+  scene.add(buildBuildings(bI16, world.bpolys, route, clear));
   setLoad(0.8, 'Đang trồng dừa, lắp đèn đường & giao thông...'); await nextFrame();
   scene.add(buildForest(terrain, route));
   scene.add(buildRoadsideTrees(route, terrain));
@@ -85,28 +97,19 @@ async function boot() {
   const coastalLife = buildCoastalLife(route, terrain);
   scene.add(coastalLife.group);
 
-  // points of interest: world position + nearest spot on the route
-  const pois = POIS.map((p) => {
-    const [x, z] = ll2xz(p.lat, p.lon);
-    const pr = route.project(x, z);
-    return { ...p, x, z, s: pr.s, y: terrain.heightAt(x, z) };
-  }).sort((a, b) => a.s - b.s);
-  const lm = buildLandmarks(pois, terrain); scene.add(lm.group);
+  scene.add(buildSeafrontParks(route, terrain, pois));
+  const lm = buildLandmarks(pois, terrain, route); scene.add(lm.group);
 
   const bike = buildScooter(); scene.add(bike);
   const rider = new Rider(route, bike);
-  rider.teleport(parseFloat(params.get('s') || '40'));
+  const tower = pois.find((p) => p.id === 'tamthang');
+  rider.teleport(params.has('s') ? parseFloat(params.get('s')) : Math.max(30, (tower ? tower.s : 400) - 170), 1);
   const rig = new CameraRig(camera, terrain);
   rig.yaw = rider.heading;
   const input = new Input(canvas);
   const sound = new SoundEngine();
 
-  const minimap = new Minimap($('#hud'), ground, terrain, route, pois, (targetS) => {
-    leave();
-    rider.teleport(targetS, rider.dir);
-    rig.yaw = rider.heading;
-    if (rig.settle) rig.settle();
-  });
+  const minimap = new Minimap($('#hud'), ground, terrain, route, pois, (targetS) => jump(targetS, rider.dir));
 
   setLoad(1, 'Sẵn sàng!');
 
@@ -114,7 +117,7 @@ async function boot() {
   const labels = pois.map((p) => {
     const el = document.createElement('div');
     el.className = 'lbl';
-    el.onclick = () => visit(p);
+    el.onclick = () => jump(Math.max(5, p.s - 40), 1, () => visit(p));
     $('#labels').append(el);
     return el;
   });
@@ -161,7 +164,24 @@ async function boot() {
     $('#minimap').style.opacity = '1';
     sound.stopSpeak();
     rider.autoPaused = false;
-    if (rig.settle) rig.settle(); else rig.setMode('chase');
+    rig.setMode('chase');
+  }
+
+  // Smooth teleport: fade out, move the rider, put the chase camera straight behind, fade back in.
+  const fade = $('#fade');
+  let jumping = false;
+  function jump(s, dir = rider.dir, then) {
+    if (jumping) return;
+    jumping = true;
+    fade.classList.add('on');
+    setTimeout(() => {
+      if (visiting) { visiting = null; card.hidden = true; $('#minimap').style.opacity = '1'; sound.stopSpeak(); }
+      if (rig.mode === 'fly') { rig.mode = 'chase'; document.querySelector('[data-act=fly]').classList.remove('active'); }
+      rider.teleport(Math.max(5, Math.min(route.length - 5, s)), dir);
+      rig.settle(rider);
+      if (then) then();
+      requestAnimationFrame(() => { fade.classList.remove('on'); jumping = false; });
+    }, 260);
   }
 
   function takePhoto() {
@@ -207,21 +227,18 @@ async function boot() {
   for (const ev of ['pointerdown', 'mouseenter', 'focus']) $('#sv').addEventListener(ev, () => { $('#sv').href = svUrl(); });
   $('#stops').addEventListener('click', (e) => {
     const d = e.target.closest('[data-i]'); if (!d) return;
-    const p = pois[+d.dataset.i]; $('#stops').hidden = true; leave();
-    rider.teleport(Math.max(5, p.s - 60), 1); rig.yaw = rider.heading;
-    if (rig.settle) rig.settle();
+    const p = pois[+d.dataset.i]; $('#stops').hidden = true;
+    jump(Math.max(5, p.s - 60), 1);
   });
   $('#bar').addEventListener('click', (e) => {
     const tick = e.target.closest('[data-i]');
     if (tick) {
       const p = pois[+tick.dataset.i];
-      if (p) { leave(); rider.teleport(Math.max(5, p.s - 40), 1); visit(p); return; }
+      if (p) { jump(Math.max(5, p.s - 40), 1, () => visit(p)); return; }
     }
     const rect = $('#bar').getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    leave();
-    rider.teleport(pct * route.length, rider.dir);
-    rig.yaw = rider.heading;
+    jump(pct * route.length, rider.dir);
   });
   for (const b of document.querySelectorAll('#pad button')) {
     const k = b.dataset.k;
@@ -299,7 +316,7 @@ async function boot() {
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
-  window.__app = { rider, rig, env, route, pois, visit, leave, act, scene, renderer, camera, sound, minimap };
+  window.__app = { rider, rig, env, route, pois, visit, leave, act, jump, scene, renderer, camera, sound, minimap };
   frame();
 }
 

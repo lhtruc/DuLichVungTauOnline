@@ -130,28 +130,30 @@ export function buildForest(terrain, route) {
 export function buildRoadsideTrees(route, terrain) {
   const palms = [[], [], []], trees = [[], []];
   const f = {};
-  const spacing = [26, 13, 30, 12];
+  const SPACING = { 'Trần Phú': 26, 'Quang Trung': 13, 'Hạ Long': 30, 'Thùy Vân': 12 };
   for (let s = 20; s < route.length - 10;) {
-    const k = route.sectionIndex(s);
+    const name = route.sections[route.sectionIndex(s)].name;
+    const k = name === 'Trần Phú' ? 0 : name === 'Hạ Long' ? 2 : 1;
     const fr = route.at(s, f);
     const h = hash2(Math.round(s), 7);
-    // sea side (right of travel)
-    const offR = fr.cw + Math.max(1.2, fr.swR - 1.0);
-    const px = fr.pos.x + fr.right.x * offR, pz = fr.pos.z + fr.right.z * offR;
+    const sea = route.seaSide;
+    // sea side: coconut palms along the promenade
+    const offS = sea * (fr.cw + Math.max(1.2, fr.sea - 1.0));
+    const px = fr.pos.x + fr.right.x * offS, pz = fr.pos.z + fr.right.z * offS;
     if (h > (k === 0 || k === 2 ? 0.35 : 0.05)) {
       palms[(h * 3) | 0].push({ x: px, y: fr.pos.y + 0.1, z: pz, ry: h * 40, s: 0.85 + hash2(Math.round(s), 3) * 0.45 });
     }
-    // land side
+    // land side: bàng / phượng shade trees
     const h2 = hash2(Math.round(s), 19);
     if (h2 > 0.3) {
-      const offL = -(fr.cw + Math.max(1.0, fr.swL - 0.9));
+      const offL = -sea * (fr.cw + Math.max(1.0, fr.land - 0.9));
       trees[h2 > 0.86 ? 1 : 0].push({ x: fr.pos.x + fr.right.x * offL, y: fr.pos.y + 0.1, z: fr.pos.z + fr.right.z * offL, ry: h2 * 30, s: 0.8 + h2 * 0.5 });
     }
     // extra palms on the central reservation of the big avenues
     if (fr.med > 0.8 && hash2(Math.round(s), 31) > 0.5) {
       palms[1].push({ x: fr.pos.x, y: fr.pos.y + 0.2, z: fr.pos.z, ry: h2 * 50, s: 0.7 + h * 0.3 });
     }
-    s += spacing[k] * (0.8 + h * 0.5);
+    s += SPACING[name] * (0.8 + h * 0.5);
   }
   const mat = foliageMat();
   const group = new THREE.Group(); group.name = 'roadside-trees';

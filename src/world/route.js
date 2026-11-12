@@ -1,31 +1,36 @@
 import * as THREE from 'three';
 import { clamp, lerp, smoothstep } from '../core/util.js';
 
-// carriageway half-width, median half-width, pavement left (land side), pavement right (sea side)
-const PROFILE = [
-  { cw: 5.2, med: 0, swL: 2.2, swR: 2.8 },  // Trần Phú
-  { cw: 8.6, med: 1.0, swL: 4.0, swR: 5.5 }, // Quang Trung
-  { cw: 5.6, med: 0, swL: 1.6, swR: 3.2 },  // Hạ Long
-  { cw: 8.8, med: 1.2, swL: 5.0, swR: 7.5 }, // Thùy Vân
-];
+// carriageway half-width, median half-width, pavement on the land side, pavement on the sea side
+const PROFILE = {
+  'Trần Phú': { cw: 5.2, med: 0, land: 2.2, sea: 2.8 },
+  'Quang Trung': { cw: 8.6, med: 1.0, land: 4.0, sea: 5.5 },
+  'Hạ Long': { cw: 5.6, med: 0, land: 1.6, sea: 3.2 },
+  'Thùy Vân': { cw: 8.8, med: 1.2, land: 5.0, sea: 7.5 },
+};
 
-/** The tour line: Trần Phú → Quang Trung → Hạ Long → Thùy Vân, sampled every `step` metres. */
+/** The tour line: Thùy Vân (Bãi Sau) → Hạ Long → Quang Trung → Trần Phú, sampled every `step` metres. */
 export class Route {
   constructor(data) {
     this.step = data.step; this.length = data.length;
     this.pts = Float32Array.from(data.pts);
     this.n = this.pts.length / 3;
     this.sections = data.sections;
+    /** +1: sea on the right of travel, -1: sea on the left. */
+    this.seaSide = data.seaSide || 1;
+    const side = (p) => (this.seaSide > 0 ? { cw: p.cw, med: p.med, swL: p.land, swR: p.sea } : { cw: p.cw, med: p.med, swL: p.sea, swR: p.land });
+    const profs = this.sections.map((sec) => side(PROFILE[sec.name] || PROFILE['Trần Phú']));
+    const last = this.sections.length - 1;
     // per-sample cross-section, blended across section joins
     this.prof = new Float32Array(this.n * 4);
     const B = 48;
     for (let i = 0; i < this.n; i++) {
       const s = i * this.step;
       let k = this.sectionIndex(s);
-      let p = PROFILE[k], q = p, t = 0;
+      let p = profs[k], q = p, t = 0;
       const sec = this.sections[k];
-      if (k < 3 && s > sec.to - B) { q = PROFILE[k + 1]; t = 0.5 * smoothstep(sec.to - B, sec.to, s); }
-      else if (k > 0 && s < sec.from + B) { q = PROFILE[k - 1]; t = 0.5 * (1 - smoothstep(sec.from, sec.from + B, s)); }
+      if (k < last && s > sec.to - B) { q = profs[k + 1]; t = 0.5 * smoothstep(sec.to - B, sec.to, s); }
+      else if (k > 0 && s < sec.from + B) { q = profs[k - 1]; t = 0.5 * (1 - smoothstep(sec.from, sec.from + B, s)); }
       this.prof[i * 4] = lerp(p.cw, q.cw, t); this.prof[i * 4 + 1] = lerp(p.med, q.med, t);
       this.prof[i * 4 + 2] = lerp(p.swL, q.swL, t); this.prof[i * 4 + 3] = lerp(p.swR, q.swR, t);
     }
@@ -47,6 +52,8 @@ export class Route {
     const right = out.right || (out.right = new THREE.Vector3());
     right.set(-fwd.z, 0, fwd.x).normalize();
     const j = Math.min(Math.round(f), this.n - 1);
+    out.sea = this.seaSide > 0 ? this.prof[j * 4 + 3] : this.prof[j * 4 + 2];
+    out.land = this.seaSide > 0 ? this.prof[j * 4 + 2] : this.prof[j * 4 + 3];
     out.cw = this.prof[j * 4]; out.med = this.prof[j * 4 + 1]; out.swL = this.prof[j * 4 + 2]; out.swR = this.prof[j * 4 + 3];
     return out;
   }

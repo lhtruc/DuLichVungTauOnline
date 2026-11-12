@@ -20,13 +20,14 @@ export function buildCoastalLife(route, terrain) {
   const step = quality.pick(72, 48, 36);
   for (let s = 30; s < route.length - 30; s += step) {
     const fr = route.at(s, f);
-    // Sea-side promenade lamps
-    const offR = fr.cw + 0.65;
+    // Sea-side promenade lamps, arm reaching over the road
+    const sgn = route.seaSide;
+    const offR = sgn * (fr.cw + 0.65);
     lampPosts.push({
       x: fr.pos.x + fr.right.x * offR,
-      y: fr.pos.y,
+      y: fr.pos.y + 0.16,
       z: fr.pos.z + fr.right.z * offR,
-      ry: Math.atan2(-fr.right.x, -fr.right.z)
+      ry: Math.atan2(-sgn * fr.right.x, -sgn * fr.right.z)
     });
     // Dual carriageway median lamps on Quang Trung & Thùy Vân
     if (fr.med > 0.6) {

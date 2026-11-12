@@ -62,3 +62,6 @@ button.on, button.active { background:var(--accent); border-color:transparent; }
 #loadtxt { font-size:12px; opacity:.75; margin:8px 0 18px; }
 #start { font-size:17px; font-weight:700; padding:14px 34px; background:var(--accent); border:none; }
 #start:disabled { opacity:.4; cursor:default; }
+
+#fade { position:fixed; inset:0; background:#0b1d2b; opacity:0; pointer-events:none; transition:opacity .25s ease; z-index:50; }
+#fade.on { opacity:1; }

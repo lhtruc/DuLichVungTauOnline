@@ -13,6 +13,12 @@ export class CameraRig {
     this.orbit = null; this.look = new THREE.Vector3(); this._tmp = new THREE.Vector3();
     this.blend = 1; this.from = { pos: new THREE.Vector3(), quat: new THREE.Quaternion() };
   }
+  /** Snap to the chase view right behind the rider (after a teleport). */
+  settle(rider) {
+    this.mode = 'chase'; this.orbit = null; this.blend = 1;
+    this.yawOff = 0; this.pitch = 0.2;
+    if (rider) { this.yaw = rider.heading; }
+  }
   startBlend() { this.from.pos.copy(this.camera.position); this.from.quat.copy(this.camera.quaternion); this.blend = 0; }
   setMode(mode) { if (mode === this.mode) return; this.startBlend(); if (mode === 'fly') { this.fly.pos.copy(this.camera.position); this.fly.pos.y += 25; const e = new THREE.Euler().setFromQuaternion(this.camera.quaternion, 'YXZ'); this.fly.yaw = e.y; this.fly.pitch = Math.min(e.x, -0.25); } this.mode = mode; }
   showcase(center, bearingDeg, dist, height) {

@@ -28,13 +28,14 @@ const check = (ok, msg) => { log(ok ? '  ok  ' : ' FAIL ', msg); if (!ok) errors
   const until = (fn, t = 30000) => p.waitForFunction(fn, null, { timeout: t }).then(() => true, () => false);
 
   log('1. load + intro');
-  await p.goto('http://localhost:4173/?q=low&s=900');
+  await p.goto((process.env.BASE || 'http://localhost:4173') + '/?q=low&s=900');
   await p.waitForFunction(() => window.__app, null, { timeout: 120000 });
   check(await p.$eval('#start', (e) => !e.disabled), 'Start button enabled after load');
   await p.click('#start');
   await p.waitForTimeout(1200);
   check(await app(() => !document.querySelector('#hud').hidden), 'HUD visible after start');
   check(await app(() => window.__app.sound.enabled), 'sound engine initialised on start');
+  check(await app(() => window.__app.route.sections[window.__app.route.sectionIndex(window.__app.rider.s)].name === 'Thùy Vân'), 'tour starts on Thùy Vân (Bãi Sau)');
   await shot('e2e-1-start');
 
   log('2. drive with keyboard');
@@ -60,6 +61,7 @@ const check = (ok, msg) => { log(ok ? '  ok  ' : ' FAIL ', msg); if (!ok) errors
   check(!!box && box.width > 50, `minimap present (${box && Math.round(box.width)}x${box && Math.round(box.height)})`);
   const before = await app(() => window.__app.rider.s);
   await p.mouse.click(box.x + box.width * 0.46, box.y + box.height * 0.55);
+  await until((b) => Math.abs(window.__app.rider.s - b) > 50, 15000);
   await p.waitForTimeout(400);
   const after = await app(() => window.__app.rider.s);
   check(Math.abs(after - before) > 50, `minimap click moved rider (${before.toFixed(0)} -> ${after.toFixed(0)})`);
@@ -67,7 +69,7 @@ const check = (ok, msg) => { log(ok ? '  ok  ' : ' FAIL ', msg); if (!ok) errors
   log('4. progress bar click');
   const bar = await (await p.$('#bar')).boundingBox();
   await p.mouse.click(bar.x + bar.width * 0.8, bar.y + bar.height / 2);
-  await p.waitForTimeout(300);
+  await until(() => window.__app.rider.s / window.__app.route.length > 0.7, 15000);
   const f = await app(() => window.__app.rider.s / window.__app.route.length);
   check(f > 0.7 && f < 0.9, `bar click jumps to ~80% (got ${(f * 100).toFixed(0)}%)`);
 
@@ -75,7 +77,8 @@ const check = (ok, msg) => { log(ok ? '  ok  ' : ' FAIL ', msg); if (!ok) errors
   await p.click('[data-act=stops]');
   check(await app(() => !document.querySelector('#stops').hidden), 'stops list opens');
   await p.click('#stops [data-i="9"]');
-  await p.waitForTimeout(500);
+  check(await until(() => Math.abs(window.__app.rider.s - (window.__app.pois[9].s - 60)) < 3 && !document.querySelector('#fade').classList.contains('on'), 20000), 'stop click teleports with fade');
+  check(await app(() => window.__app.rig.mode === 'chase' && window.__app.rig.blend === 1), 'camera snapped behind rider (no swoop)');
   await app(() => window.__app.visit(window.__app.pois[9]));
   await p.waitForTimeout(2500);
   check(await app(() => !document.querySelector('#card').hidden), 'POI card shown');

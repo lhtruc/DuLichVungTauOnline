@@ -300,10 +300,13 @@ H_low = ndimage.gaussian_filter(H0, 5.0)
 w_hi = np.clip((H_low - 6) / 16, 0, 1)
 w_hi = w_hi * w_hi * (3 - 2 * w_hi)
 H = H_low * (1 - w_hi) + H_fine * w_hi
+# Núi Lớn / Núi Nhỏ: the 30 m DEM rounds the hills off, so lift them back a little
+EXAG = 1.3
+H = np.where(H > 3, 3 + (H - 3) * EXAG, H)
 # flat urban land sits a little above the sea
 H_land = np.maximum(H, 1.6)
 # coastal envelope: land rises from the waterline
-H_land = np.minimum(H_land, 0.25 + np.maximum(SD, 0) * 0.22)
+H_land = np.minimum(H_land, 0.25 + np.maximum(SD, 0) * 0.55)  # steep cliffs where the hills meet the sea
 H_sea = np.maximum(-0.35 + SD * 0.035, -14.0)
 Hm = np.where(SD > 0, H_land, H_sea)
 # inland water: basin below sea level so the water plane shows
@@ -322,14 +325,26 @@ def sample_grid(arr, x, n):
 
 prof = sample_grid(np.where(SD > 0, np.maximum(H, 1.6), 1.6), route_xy[:, 0], route_xy[:, 1])
 prof = np.maximum(prof, 2.6)
-for win in (61, 41, 21):  # ~ +-120 m, then finer
+for win in (21, 11):  # ~ +-40 m: keep the real ups and downs of the coast road
     prof = np.convolve(np.pad(prof, (win // 2, win // 2), mode="edge"), np.ones(win) / win, mode="valid")
 prof = np.maximum(prof, 2.6)
+# limit grade to ~12 % (steep but drivable, like Dốc Nghinh Phong) with symmetric passes
+G = 0.12 * STEP
+for _ in range(3):
+    for i in range(1, len(prof)):
+        prof[i] = np.clip(prof[i], prof[i - 1] - G, prof[i - 1] + G)
+    for i in range(len(prof) - 2, -1, -1):
+        prof[i] = np.clip(prof[i], prof[i + 1] - G, prof[i + 1] + G)
+prof = np.convolve(np.pad(prof, (3, 3), mode="edge"), np.ones(7) / 7, mode="valid")
 print(f"route elevation {prof.min():.1f} .. {prof.max():.1f} m")
 
 best_d = np.full((NZ, NX), 1e9, np.float32)
 best_h = np.zeros((NZ, NX), np.float32)
 best_w = np.zeros((NZ, NX), np.float32)
+best_f = np.zeros((NZ, NX), np.float32)
+# extra level ground beside the big seafront parks (Bãi Trước on Quang Trung, Bãi Sau on Thùy Vân)
+SEC_FLAT = np.array([0.0, 14.0, 0.0, 22.0])
+route_flat = SEC_FLAT[route_sec]
 RAD = 70.0
 rc = int(RAD / CELL) + 1
 for i in range(len(route_xy)):
@@ -345,14 +360,15 @@ for i in range(len(route_xy)):
     best_d[j0:j1, i0:i1][m] = d[m]
     best_h[j0:j1, i0:i1][m] = prof[i]
     best_w[j0:j1, i0:i1][m] = route_half[i]
-flat = best_w + 9.0
+    best_f[j0:j1, i0:i1][m] = route_flat[i]
+flat = best_w + 9.0 + best_f
 t = np.clip((best_d - flat) / 38.0, 0, 1)
 t = t * t * (3 - 2 * t)
 carved = (best_h - 0.25) * (1 - t) + Hm * t
 # on the seaward side keep a sea wall: do not let the corridor drag the seabed far out
 Hf = np.where(best_d < RAD, carved, Hm)
 Hf = np.where((SD < -45) & (best_d > flat), np.minimum(Hf, Hm * 0.5 + Hf * 0.5), Hf)
-Hf = np.clip(Hf, -19.5, 300).astype(np.float32)
+Hf = np.clip(Hf, -19.5, 400).astype(np.float32)
 (np.round((Hf + 20) * 100)).astype("<u2").tofile(f"{OUT}/terrain.bin")
 print(f"terrain h {Hf.min():.1f} .. {Hf.max():.1f}")
 
@@ -634,10 +650,17 @@ print("beaches", len(beaches), "parks", len(parks), "piers", len(piers), "pools"
 # --------------------------------------------------------------------------
 # 9. Write world.json
 # --------------------------------------------------------------------------
+# The tour starts at Bãi Sau: reverse the route (Thùy Vân -> Hạ Long -> Quang Trung -> Trần Phú).
+# Driving that way the sea is on the LEFT (seaSide = -1).
 sections = []
-for s_i, name in enumerate(MAIN):
+for s_i, name in reversed(list(enumerate(MAIN))):
     ii = np.where(route_sec == s_i)[0]
-    sections.append({"name": name, "from": round(float(ii[0] * STEP), 1), "to": round(float(min((ii[-1] + 1) * STEP, ROUTE_LEN)), 1)})
+    a, b = float(ii[0] * STEP), float(min((ii[-1] + 1) * STEP, ROUTE_LEN))
+    sections.append({"name": name, "from": round(ROUTE_LEN - b, 1), "to": round(ROUTE_LEN - a, 1)})
+sections[0]["from"] = 0.0
+sections[-1]["to"] = round(float(ROUTE_LEN), 1)
+route_xy, prof, route_half, route_dual = route_xy[::-1], prof[::-1], route_half[::-1], route_dual[::-1]
+signs = [[len(route_xy) - 1 - ri, -side, name, grp] for ri, side, name, grp in signs][::-1]
 route_out = []
 for (x, n_), y in zip(route_xy, prof):
     route_out += [round(float(x), 2), round(float(y), 2), round(float(-n_), 2)]
@@ -646,7 +669,7 @@ world = {
              "x0": XMIN, "z0": -NMAX, "hScale": 0.01, "hOffset": -20},
     "route": {"step": STEP, "length": round(float(ROUTE_LEN), 2), "pts": route_out,
               "half": [round(float(v), 2) for v in route_half],
-              "dual": [int(b) for b in route_dual], "sections": sections},
+              "dual": [int(b) for b in route_dual], "sections": sections, "seaSide": -1},
     "roads": roads,
     "bpolys": polys,
     "signs": signs,
