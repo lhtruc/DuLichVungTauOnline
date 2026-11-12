@@ -1,8 +1,10 @@
 import * as THREE from 'three';
-import { setGeo, ll2xz, xz2ll, bearingDeg } from './core/geo.js';
+import { setGeo, ll2xz, xz2ll } from './core/geo.js';
 import { U, quality } from './core/shared.js';
 import { isTouch, fmtKm } from './core/util.js';
 import { Input } from './core/input.js';
+import { SoundEngine } from './core/audio.js';
+import { Minimap } from './core/minimap.js';
 import { Terrain } from './world/terrain.js';
 import { buildGroundCanvas, groundTexture } from './world/groundmap.js';
 import { buildSea } from './world/sea.js';
@@ -12,6 +14,7 @@ import { buildRouteRoad } from './world/road.js';
 import { buildBuildings } from './world/buildings.js';
 import { buildForest, buildRoadsideTrees } from './world/vegetation.js';
 import { buildLandmarks } from './world/landmarks.js';
+import { buildCoastalLife } from './world/traffic.js';
 import { buildScooter } from './player/scooter.js';
 import { Rider } from './player/rider.js';
 import { CameraRig } from './player/camera.js';
@@ -21,7 +24,7 @@ const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
 quality.set(params.get('q') || (isTouch ? 'low' : 'high'));
 
-const setLoad = (f, txt) => { $('#loadbar i').style.width = Math.round(f * 100) + '%'; if (txt) $('#loadtxt').textContent = txt; };
+const setLoad = (f, txt) => { $('#loadbar i').style.width = Math.round(f * 100) + '%'; if (txt) $('#loadtxt').innerText = txt; };
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 // Some static hosts refuse .bin files; the same bytes are then published under a .wasm name.
 const bin = async (url, T) => {
@@ -30,17 +33,29 @@ const bin = async (url, T) => {
   return new T(await r.arrayBuffer());
 };
 
+function fmtClock(h) {
+  const hr = Math.floor(((h % 24) + 24) % 24);
+  const mn = Math.floor((h - Math.floor(h)) * 60);
+  const icon = (hr >= 6 && hr < 17) ? '☀️' : (hr >= 17 && hr < 19) ? '🌅' : '🌙';
+  return `${icon} ${String(hr).padStart(2, '0')}:${String(mn).padStart(2, '0')}`;
+}
+
 async function boot() {
-  setLoad(0.05, 'Đang tải bản đồ Vũng Tàu…');
+  setLoad(0.05, 'Đang tải bản đồ Vũng Tàu...');
   const [world, hU16, cover, bI16] = await Promise.all([
     fetch('./data/world.json').then((r) => r.json()),
-    bin('./data/terrain.bin', Uint16Array), bin('./data/cover.bin', Uint8Array), bin('./data/buildings.bin', Int16Array),
+    bin('./data/terrain.bin', Uint16Array), bin('./data/cover.bin', Uint8Array), bin('./data/buildings.bin', Int16Array)
   ]);
   setGeo(world.meta);
-  setLoad(0.3, 'Đang dựng địa hình Núi Lớn, Núi Nhỏ…'); await nextFrame();
+  setLoad(0.3, 'Đang dựng địa hình Núi Lớn, Núi Nhỏ...'); await nextFrame();
 
   const canvas = $('#c');
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !quality.low, powerPreference: 'high-performance' });
+  const renderer = new THREE.WebGLRenderer({
+    canvas,
+    antialias: !quality.low,
+    powerPreference: 'high-performance',
+    preserveDrawingBuffer: true
+  });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, quality.pick(1.25, 1.5, 2)));
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.92;
   const scene = new THREE.Scene();
@@ -52,18 +67,23 @@ async function boot() {
   const route = new Route(world.route);
   const sky = buildSky(); scene.add(sky);
   const env = new Environment(scene, sky);
-  env.setHour(parseFloat(params.get('t') || '16.6'));
+  const TIMES = [16.6, 17.55, 20.5, 6.1, 10.5];
+  let timeIdx = 0;
+  env.setHour(parseFloat(params.get('t') || String(TIMES[0])));
 
   const ground = buildGroundCanvas(world, terrain, bI16, quality.pick(2048, 4096, 4096));
   scene.add(terrain.buildMesh(groundTexture(ground, renderer)));
   scene.add(buildSea(terrain));
-  setLoad(0.5, 'Đang trải nhựa đường Trần Phú → Thùy Vân…'); await nextFrame();
+  setLoad(0.5, 'Đang trải nhựa đường Trần Phú → Thùy Vân...'); await nextFrame();
   scene.add(buildRouteRoad(route));
-  setLoad(0.62, 'Đang xây ' + (bI16.length / 8).toLocaleString('vi') + ' ngôi nhà…'); await nextFrame();
+  setLoad(0.62, 'Đang xây ' + (bI16.length / 8).toLocaleString('vi') + ' ngôi nhà...'); await nextFrame();
   scene.add(buildBuildings(bI16, world.bpolys, route));
-  setLoad(0.8, 'Đang trồng dừa và phủ rừng…'); await nextFrame();
+  setLoad(0.8, 'Đang trồng dừa, lắp đèn đường & giao thông...'); await nextFrame();
   scene.add(buildForest(terrain, route));
   scene.add(buildRoadsideTrees(route, terrain));
+
+  const coastalLife = buildCoastalLife(route, terrain);
+  scene.add(coastalLife.group);
 
   // points of interest: world position + nearest spot on the route
   const pois = POIS.map((p) => {
@@ -79,56 +99,148 @@ async function boot() {
   const rig = new CameraRig(camera, terrain);
   rig.yaw = rider.heading;
   const input = new Input(canvas);
+  const sound = new SoundEngine();
+
+  const minimap = new Minimap($('#hud'), ground, terrain, route, pois, (targetS) => {
+    leave();
+    rider.teleport(targetS, rider.dir);
+    rig.yaw = rider.heading;
+    if (rig.settle) rig.settle();
+  });
+
   setLoad(1, 'Sẵn sàng!');
 
-  // ---------------------------------------------------------------- UI
-  const labels = pois.map((p) => { const el = document.createElement('div'); el.className = 'lbl'; $('#labels').appendChild(el); return el; });
-  $('#ticks').innerHTML = pois.map((p) => `<i style="left:${(p.s / route.length * 100).toFixed(2)}%" title="${p.name}"></i>`).join('');
+  // ----------------------------------------------------------- UI
+  const labels = pois.map((p) => {
+    const el = document.createElement('div');
+    el.className = 'lbl';
+    el.onclick = () => visit(p);
+    $('#labels').append(el);
+    return el;
+  });
+  $('#ticks').innerHTML = pois.map((p, i) => `<i data-i="${i}" style="left:${(p.s / route.length * 100).toFixed(2)}%" title="${p.name}"></i>`).join('');
   $('#stops').innerHTML = pois.map((p, i) => `<div data-i="${i}"><span>${p.icon} ${p.name}</span><small>km ${(p.s / 1000).toFixed(1)}</small></div>`).join('');
+
   let visiting = null;
   const card = $('#card');
   function svUrl() {
     const [lat, lon] = xz2ll(rider.pos.x, rider.pos.z);
-    return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat.toFixed(6)},${lon.toFixed(6)}&heading=${Math.round(bearingDeg(rider.fwd.x, rider.fwd.z))}`;
+    return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat.toFixed(6)},${lon.toFixed(6)}&heading=${(rig.yaw * 180 / Math.PI).toFixed(1)}`;
   }
   function visit(p) {
     visiting = p; rider.autoPaused = true;
+    $('#minimap').style.opacity = '0';
     const c = new THREE.Vector3(p.x, p.y + (p.view[2] > 40 ? 10 : p.view[2] * 0.45), p.z);
     rig.showcase(c, p.view[0], p.view[1], p.view[2]);
     card.innerHTML = `<div class="tag">${p.tag}</div><h2>${p.icon} ${p.name}</h2><p>${p.text}</p><ul>${p.facts.map((f) => `<li>${f}</li>`).join('')}</ul>
-      <div class="row"><button id="leave">Tiếp tục hành trình</button>
-      <a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lon}">Google Maps ↗</a></div>`;
+      <div class="row">
+        <button id="leave">🛵 Tiếp tục</button>
+        <button id="tts">🔊 Thuyết minh</button>
+        <a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lon}">Bản đồ ↗</a>
+        <a target="_blank" rel="noopener" href="${svUrl()}">Street View ↗</a>
+      </div>`;
     card.hidden = false;
     $('#leave').onclick = leave;
+    const ttsBtn = $('#tts');
+    if (ttsBtn) {
+      ttsBtn.onclick = () => {
+        if (sound.speaking) {
+          sound.stopSpeak();
+          ttsBtn.textContent = '🔊 Thuyết minh';
+        } else {
+          ttsBtn.textContent = '⏹️ Dừng đọc';
+          sound.speakPoi(p, () => { if (ttsBtn) ttsBtn.textContent = '🔊 Thuyết minh'; });
+        }
+      };
+    }
   }
-  function leave() { if (!visiting) return; visiting = null; card.hidden = true; rider.autoPaused = false; rig.setMode('chase'); rig.mode = 'chase'; }
-  const TIMES = [16.6, 17.55, 20.5, 6.1, 10.5];
-  let timeIdx = 0;
+  function leave() {
+    if (!visiting) return;
+    visiting = null;
+    card.hidden = true;
+    $('#minimap').style.opacity = '1';
+    sound.stopSpeak();
+    rider.autoPaused = false;
+    if (rig.settle) rig.settle(); else rig.setMode('chase');
+  }
+
+  function takePhoto() {
+    renderer.render(scene, camera);
+    const out = document.createElement('canvas');
+    out.width = canvas.width;
+    out.height = canvas.height;
+    const ctx = out.getContext('2d');
+    ctx.drawImage(canvas, 0, 0);
+    // Postcard watermark
+    const sec = route.sections[route.sectionIndex(rider.s)];
+    const pad = Math.round(out.width * 0.022);
+    ctx.fillStyle = 'rgba(10, 24, 38, 0.72)';
+    ctx.fillRect(pad, out.height - pad - 68, 430, 56);
+    ctx.fillStyle = '#ff7a45';
+    ctx.font = 'bold 20px system-ui, sans-serif';
+    ctx.fillText('🛵 VŨNG TÀU ONLINE · 16,3 KM VEN BIỂN', pad + 14, out.height - pad - 40);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '15px system-ui, sans-serif';
+    ctx.fillText(`Đường ${sec.name} · Km ${(rider.s / 1000).toFixed(1)} · ${fmtClock(env.hour)}`, pad + 14, out.height - pad - 18);
+    const a = document.createElement('a');
+    a.download = `vung-tau-online-km${(rider.s / 1000).toFixed(1)}.png`;
+    a.href = out.toDataURL('image/png');
+    a.click();
+  }
+
   const act = {
-    auto() { rider.auto = !rider.auto; rider.autoPaused = false; document.querySelector('[data-act=auto]').classList.toggle('on', rider.auto); },
+    auto() { rider.auto = !rider.auto; rider.autoPaused = false; document.querySelector('[data-act=auto]').classList.toggle('active', rider.auto); },
     turn() { rider.turnAround(); },
     cam() { leave(); rig.setMode(rig.mode === 'chase' ? 'first' : 'chase'); },
-    fly() { leave(); rig.setMode(rig.mode === 'fly' ? 'chase' : 'fly'); document.querySelector('[data-act=fly]').classList.toggle('on', rig.mode === 'fly'); },
-    time() { timeIdx = (timeIdx + 1) % TIMES.length; env.setHour(TIMES[timeIdx]); },
+    fly() { leave(); rig.setMode(rig.mode === 'fly' ? 'chase' : 'fly'); document.querySelector('[data-act=fly]').classList.toggle('active', rig.mode === 'fly'); },
+    time() { timeIdx = (timeIdx + 1) % TIMES.length; env.setHour(TIMES[timeIdx]); $('#clock-badge').textContent = fmtClock( env.hour ); },
+    sound() {
+      const on = sound.toggle();
+      const btn = document.querySelector('[data-act=sound]');
+      if (btn) { btn.classList.toggle('active', on); btn.textContent = on ? '🔊 Âm thanh: Bật' : '🔇 Âm thanh'; }
+    },
+    horn() { sound.horn(); },
+    photo() { takePhoto(); },
     stops() { $('#stops').hidden = !$('#stops').hidden; },
   };
-  $('#btns').addEventListener('click', (e) => { const a = e.target.dataset.act; if (a) act[a](); });
+  $('#btns').addEventListener('click', (e) => { const btn = e.target.closest('[data-act]'); if (btn) act[btn.dataset.act](); });
   for (const ev of ['pointerdown', 'mouseenter', 'focus']) $('#sv').addEventListener(ev, () => { $('#sv').href = svUrl(); });
   $('#stops').addEventListener('click', (e) => {
     const d = e.target.closest('[data-i]'); if (!d) return;
-    const p = pois[+d.dataset.i]; leave(); rider.teleport(Math.max(5, p.s - 60), 1); rig.yaw = rider.heading; rig.yawOff = 0; $('#stops').hidden = true;
+    const p = pois[+d.dataset.i]; $('#stops').hidden = true; leave();
+    rider.teleport(Math.max(5, p.s - 60), 1); rig.yaw = rider.heading;
+    if (rig.settle) rig.settle();
+  });
+  $('#bar').addEventListener('click', (e) => {
+    const tick = e.target.closest('[data-i]');
+    if (tick) {
+      const p = pois[+tick.dataset.i];
+      if (p) { leave(); rider.teleport(Math.max(5, p.s - 40), 1); visit(p); return; }
+    }
+    const rect = $('#bar').getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    leave();
+    rider.teleport(pct * route.length, rider.dir);
+    rig.yaw = rider.heading;
   });
   for (const b of document.querySelectorAll('#pad button')) {
     const k = b.dataset.k;
     b.addEventListener('pointerdown', (e) => { input.touch[k] = true; e.preventDefault(); });
     for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) b.addEventListener(ev, () => { input.touch[k] = false; });
   }
+  $('#clock-badge').textContent = fmtClock(env.hour);
   $('#start').disabled = false;
-  const start = () => { $('#intro').classList.add('hide'); $('#hud').hidden = false; };
+  const start = () => {
+    $('#intro').classList.add('hide');
+    $('#hud').hidden = false;
+    sound.init();
+    const sBtn = document.querySelector('[data-act=sound]');
+    if (sBtn && sound.enabled) { sBtn.classList.add('active'); sBtn.textContent = '🔊 Âm thanh: Bật'; }
+  };
   $('#start').onclick = start;
   if (params.has('nointro')) start();
 
-  // ---------------------------------------------------------------- loop
+  // ----------------------------------------------------------- loop
   const clock = new THREE.Clock();
   const v3 = new THREE.Vector3();
   let near = null;
@@ -140,29 +252,39 @@ async function boot() {
     if (input.hit('KeyC')) act.cam();
     if (input.hit('KeyF')) act.fly();
     if (input.hit('KeyN')) act.time();
+    if (input.hit('KeyM')) act.sound();
+    if (input.hit('KeyH')) act.horn();
+    if (input.hit('KeyP')) act.photo();
     if (input.hit('KeyE') && rig.mode !== 'fly') { if (visiting) leave(); else if (near) visit(near); }
     if (input.hit('Escape')) leave();
+
     const ax = input.axis();
     if (rig.mode === 'fly' || visiting) rider.update(dt, { fwd: 0, steer: 0, boost: false, brake: false });
     else { if (ax.fwd !== 0 && visiting) leave(); rider.update(dt, ax); }
     rig.update(dt, input, rider);
-    env.follow(rider.pos);
-    for (const t of lm.ticks) t(U.uTime.value);
+    if (env.follow) env.follow(rider.pos);
+    const tickList = lm.ticks || (lm.tick ? [lm.tick] : []);
+    for (const t of tickList) t(U.uTime.value);
+    coastalLife.tick(dt, U.uTime.value);
+    sound.update(rider.kmh || Math.abs(rider.v) * 3.6, U.uTime.value, rig.mode === 'fly');
 
     // HUD
     const sec = route.sections[route.sectionIndex(rider.s)];
     $('#street').textContent = sec.name;
-    $('#speed b').textContent = Math.round(rider.kmh);
+    $('#speed b').textContent = Math.round(rider.kmh ?? Math.abs(rider.v) * 3.6);
     $('#barfill').style.width = (rider.s / route.length * 100).toFixed(2) + '%';
+    $('#dist-badge').textContent = `${(rider.s / 1000).toFixed(1).replace('.', ',')} / ${(route.length / 1000).toFixed(1).replace('.', ',')} km`;
+    minimap.update(rider, rig.yaw || rider.heading);
+
     near = null; let ahead = null;
     for (const p of pois) {
       const d = (p.s - rider.s) * rider.dir;
       if (Math.abs(p.s - rider.s) < 130) near = !near || Math.abs(p.s - rider.s) < Math.abs(near.s - rider.s) ? p : near;
       if (d > 130 && (!ahead || d < (ahead.s - rider.s) * rider.dir)) ahead = p;
     }
-    $('#next').innerHTML = visiting ? '' : near ? `<b>${near.icon} ${near.name}</b> — nhấn <b>E</b> hoặc <a href="#" id="go" style="color:#ffd2b8">chạm để tham quan</a>`
-      : ahead ? `Sắp tới: ${ahead.icon} ${ahead.name} · ${fmtKm(Math.abs(ahead.s - rider.s))}` : (rider.atEnd ? '🏁 Hết đường Thùy Vân — nhấn R để quay đầu' : '');
+    $('#next').innerHTML = visiting ? '' : near ? `<b>${near.icon} ${near.name}</b> – nhấn <b>E</b> hoặc <a href="#" id="go" style="color:#ffd2b8">chạm để tham quan</a>` : ahead ? `Sắp tới: ${ahead.icon} ${ahead.name} · ${fmtKm(Math.abs(ahead.s - rider.s))}` : (rider.atEnd ? '🏁 Hết đường Thùy Vân – nhấn R để quay đầu' : '');
     const go = document.getElementById('go'); if (go) go.onclick = (e) => { e.preventDefault(); if (near) visit(near); };
+
     // floating labels
     pois.forEach((p, i) => {
       const el = labels[i];
@@ -177,7 +299,7 @@ async function boot() {
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
-  window.__app = { rider, rig, env, route, pois, visit, leave, act, scene, renderer, camera };
+  window.__app = { rider, rig, env, route, pois, visit, leave, act, scene, renderer, camera, sound, minimap };
   frame();
 }
 
