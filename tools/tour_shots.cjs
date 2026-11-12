@@ -7,7 +7,7 @@ const { chromium } = require('playwright');
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text().slice(0, 300)); });
-  await p.goto((process.env.BASE || 'http://localhost:4173') + '/?q=medium&nointro');
+  await p.goto((process.env.BASE || 'http://localhost:4173') + '/?q=medium&nointro' + (process.env.T ? '&t=' + process.env.T : ''));
   await p.waitForFunction(() => window.__app, null, { timeout: 180000 });
   const frames = (n) => p.evaluate((n) => new Promise((r) => { let k = 0; const f = () => (++k >= n ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); }), n);
   await frames(3);

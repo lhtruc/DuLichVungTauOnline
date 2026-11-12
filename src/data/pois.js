@@ -11,14 +11,14 @@ export const POIS = [
   },
   {
     id: 'tamthang', name: 'Quảng trường & Tháp Tam Thắng', icon: '🗼', lat: 10.34585, lon: 107.0967, model: 'tamthang', clear: 75, seafront: 42,
-    tag: 'Biểu tượng mới Bãi Sau', view: [125, 120, 40],
-    text: 'Tháp Tam Thắng gồm 143 trụ bê tông tiết diện đa giác ốp gốm mosaic, cao dần từ 4,55 m lên 34,25 m về phía biển. Ba trụ chính tượng trưng ba làng Thắng Nhất, Thắng Nhì, Thắng Tam và gợi hình ba mũi thuyền vươn khơi. Về đêm tháp đổi màu bằng đèn LED.',
+    tag: 'Biểu tượng mới Bãi Sau', view: [295, 120, 55],
+    text: 'Tháp Tam Thắng gồm 143 trụ bê tông tiết diện đa giác ốp gốm mosaic, cao dần từ 4,55 m lên 34,25 m về phía biển. Các trụ xếp thành khối tháp nhọn, gợi hình ba mũi thuyền vươn khơi và ba làng Thắng Nhất, Thắng Nhì, Thắng Tam. Phía trước là sân khấu và quảng trường lát caro gắn đèn; về đêm tháp rực ánh LED hồng tím.',
     facts: ['143 trụ, cao 4,55 – 34,25 m', 'Quảng trường hơn 17.000 m², sân khấu nhạc nước', 'Thiết kế: KTS Oliviero Godi (Ý), thi công 75 ngày'],
   },
   {
     id: 'caong', name: 'Công viên Cá Ông (Cột Cờ cũ)', icon: '🐋', lat: 10.3344, lon: 107.0904, model: 'caong', clear: 32,
     tag: 'Quảng trường Cột Cờ', view: [100, 36, 9],
-    text: 'Tại quảng trường Cột Cờ cũ ở đầu đường Thùy Vân, tượng cá Ông bằng đồng đỏ cao 8,8 m vươn lên giữa hồ nước có phun nước và chiếu sáng. Cá Ông (cá voi) là vị thần hộ mệnh của ngư dân miền biển; công trình mở cửa ngày 3/2/2026.',
+    text: 'Tại quảng trường Cột Cờ cũ ở đầu đường Thùy Vân, tượng cá Ông (cá voi lưng gù) đúc đồng đỏ, phủ màu xanh đồng, cao 8,8 m vươn lên từ những con sóng cuộn giữa hồ nước tròn có vòng vòi phun. Cá Ông (cá voi) là vị thần hộ mệnh của ngư dân miền biển; công trình mở cửa ngày 3/2/2026.',
     facts: ['Tượng đồng đỏ cao 8,8 m, nặng khoảng 40–50 tấn', 'Quảng trường 2.573 m², hồ nước và nhạc nước', 'Kinh phí hơn 50 tỷ đồng'],
   },
   {

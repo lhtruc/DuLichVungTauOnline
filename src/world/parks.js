@@ -35,7 +35,7 @@ export function buildSeafrontParks(route, terrain, pois) {
   };
 
   const f = {};
-  const palmItems = [], treeItems = [], pergolas = [];
+  const palmItems = [], treeItems = [], pergolas = [], frames = [], stools = [], umbrellas = [];
   for (const sec of route.sections) {
     const P = PARKS[sec.name]; if (!P) continue;
     const pos = [], nrm = [], pk = [], idx = [];
@@ -60,6 +60,19 @@ export function buildSeafrontParks(route, terrain, pois) {
         const put = (list, uu, sc) => { const lat = sea * (u0 + uu); list.push({ x: fr.pos.x + fr.right.x * lat, y: fr.pos.y + 0.1, z: fr.pos.z + fr.right.z * lat, ry: h * 40, s: sc }); };
         if (h < P.palms) put(palmItems, 4 + h2 * (P.width - 8), 0.8 + h * 0.5);
         if (h2 < P.trees) put(treeItems, 3 + h * 4, 0.9 + h2);
+        // Bãi Sau photos: round stone stools along the paths, red steel frame walkways, beach full of umbrellas
+        if (sec.name === 'Thùy Vân') {
+          const centre = 9 + 4 * Math.sin(s / 37) + 2 * Math.sin(s / 13);
+          if (h > 0.6) { const lat = sea * (u0 + centre + (h2 > 0.5 ? 2.3 : -2.3)); stools.push({ x: fr.pos.x + fr.right.x * lat, y: fr.pos.y + 0.17, z: fr.pos.z + fr.right.z * lat }); }
+          if (Math.round(s) % 160 < STEP) { const lat = sea * (u0 + P.width - 3); frames.push({ x: fr.pos.x + fr.right.x * lat, y: fr.pos.y + 0.17, z: fr.pos.z + fr.right.z * lat, ry: Math.atan2(fr.fwd.x, fr.fwd.z) }); }
+          for (let k = 0; k < 3; k++) {
+            const hk = hash2(Math.round(s) + k * 17, 5);
+            if (hk < 0.55) continue;
+            const lat = sea * (u0 + P.width + 8 + k * 9 + hk * 5);
+            const x = fr.pos.x + fr.right.x * lat, z = fr.pos.z + fr.right.z * lat, y = terrain.heightAt(x, z);
+            if (y > 0.25) umbrellas.push({ x, y, z, ry: hk * 6, color: hk > 0.78 ? 0xd34fa0 : 0x7d4bc2 });
+          }
+        }
         if (P.pergola && Math.round(s) % P.pergola < STEP) {
           const centre = 9 + 4 * Math.sin(s / 37) + 2 * Math.sin(s / 13);
           const lat = sea * (u0 + centre + 4.5);
@@ -89,6 +102,15 @@ export function buildSeafrontParks(route, terrain, pois) {
   for (let i = -4; i <= 4; i++) parts.push(new THREE.BoxGeometry(0.12, 0.14, 4.4).translate(i * 0.48, 2.85, 0));
   parts.push(new THREE.BoxGeometry(2.4, 0.45, 0.5).translate(0, 0.25, -1.2));
   const pg = mergeBoxes(parts);
+  // red steel frame walkway (arched portals with a roof grid)
+  const fr = [];
+  for (const x of [-7, -3.5, 0, 3.5, 7]) for (const z of [-2.2, 2.2]) fr.push(new THREE.BoxGeometry(0.3, 4.2, 0.3).translate(x, 2.1, z));
+  for (const z of [-2.2, 2.2]) fr.push(new THREE.BoxGeometry(14.6, 0.3, 0.3).translate(0, 4.2, z));
+  for (const x of [-7, -3.5, 0, 3.5, 7]) fr.push(new THREE.BoxGeometry(0.3, 0.3, 4.7).translate(x, 4.2, 0));
+  group.add(instancedTiles(mergeBoxes(fr), new THREE.MeshLambertMaterial({ color: 0xd2332b }), frames, 600, { castShadow: true }));
+  group.add(instancedTiles(new THREE.CylinderGeometry(0.45, 0.45, 0.45, 12).translate(0, 0.22, 0), new THREE.MeshLambertMaterial({ color: 0xdcdad4 }), stools, 600));
+  const umb = mergeBoxes([new THREE.CylinderGeometry(0.04, 0.04, 2.3, 5).translate(0, 1.15, 0), new THREE.ConeGeometry(1.3, 0.55, 8).translate(0, 2.4, 0)]);
+  group.add(instancedTiles(umb, new THREE.MeshLambertMaterial({ color: 0xffffff }), umbrellas, 600));
   group.add(instancedTiles(pg, new THREE.MeshLambertMaterial({ color: 0xf6f3ec }), pergolas, 600, { castShadow: true }));
   return group;
 }

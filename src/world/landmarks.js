@@ -60,36 +60,41 @@ function fountainJets(g, n, ringR, h, y0) {
 }
 
 // ---------------------------------------------------------------- Bãi Sau
-/** Tháp Tam Thắng: 143 polygonal pillars, 4.55 m → 34.25 m rising toward the sea, three "boat prows". */
+/** Checker paving texture (the squares at Bãi Sau use big two-tone checkerboards). */
+function checker(c1, c2, n = 16) {
+  if (typeof document === 'undefined') return L(c1);
+  const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+  const c = cv.getContext('2d'), s = 256 / n;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { c.fillStyle = (i + j) % 2 ? c2 : c1; c.fillRect(i * s, j * s, s, s); }
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return new THREE.MeshLambertMaterial({ map: tex });
+}
+
+/**
+ * Tháp Tam Thắng (photos: VnExpress 30/8/2025): 143 white square pillars stacked into a symmetric
+ * pyramid — tallest (34.25 m) in the middle, stepping down to 4.55 m at both ends and toward the land —
+ * with a stage in front, a black-and-white checkered square with ground lights, magenta LEDs at night.
+ */
 function tamthang() {
   const g = new THREE.Group(), r = rng(143);
-  // square: paving strip along the coast, fountain stage on the land side, 3.6 m viewing deck at the sea end
-  const pave = L(0xd8cfc0);
-  add(g, new THREE.BoxGeometry(150, 4, 52), pave, 0, -1.75, 0);  // raised square, sea wall on the beach side
-  for (let i = -70; i <= 70; i += 10) add(g, new THREE.BoxGeometry(0.25, 0.52, 52), L(0xb9ab98), i, 0.01, 0);
-  const pool = water(9); pool.position.set(-38, 0.3, -6); g.add(pool);
-  add(g, new THREE.TorusGeometry(9, 0.35, 6, 40), L(0xeee8dc), -38, 0.3, -6, Math.PI / 2);
-  const jetTick = fountainJets(g, 14, 6, 5, 0.3);
-  g.children.slice(-14).forEach((j) => { j.position.x += -38; j.position.z += -6; });
-  add(g, new THREE.BoxGeometry(18, 3.6, 9), pave, 0, 1.8, 24);
-  add(g, new THREE.BoxGeometry(18.4, 1.0, 0.2), L(0xffffff), 0, 4.1, 28.4);
-  for (let k = 0; k < 6; k++) add(g, new THREE.BoxGeometry(4, 0.6, 1.2), pave, 0, 0.3 + k * 0.6, 18.4 + k * 0.9 - 6);
-
-  // pillars: three rows (Thắng Nhất, Thắng Nhì, Thắng Tam) converging toward the sea
-  const ROWS = [{ x: -10, hmax: 30.8 }, { x: 0, hmax: 34.25 }, { x: 10, hmax: 27.6 }];
+  const sq = checker('#2d2f33', '#e9e6df', 24);
+  sq.map && sq.map.repeat.set(9, 3);
+  add(g, new THREE.BoxGeometry(150, 4, 56), sq, 0, -1.75, -4);           // square on a sea wall
+  // stage on the land side of the tower
+  add(g, new THREE.BoxGeometry(30, 1.2, 9), L(0x8a3b3b), 0, 0.6, -14);
+  for (let k = 0; k < 3; k++) add(g, new THREE.BoxGeometry(18 - k * 3, 0.3, 1.2), L(0xb04a4a), 0, 0.15 + k * 0.3, -19.4 + k * 1.2);
+  // 13 columns across x 11 rows toward the sea = 143 pillars
   const items = [];
-  const perRow = [48, 48, 47];
-  ROWS.forEach((row, ri) => {
-    for (let i = 0; i < perRow[ri]; i++) {
-      const t = i / (perRow[ri] - 1);
-      const z = -20 + t * 38;
-      const x = row.x * (1 - t * 0.45) + (r() - 0.5) * 6.5 * (1 - t * 0.6);
-      const h = 4.55 + (row.hmax - 4.55) * Math.pow(t, 1.7) * (0.9 + r() * 0.1);
-      const rad = 0.5 + r() * 0.9;
-      items.push({ x, z: z + (r() - 0.5) * 1.2, h: i === perRow[ri] - 1 ? row.hmax : h, rad });
-    }
-  });
-  const geo = new THREE.CylinderGeometry(1, 1, 1, 6).translate(0, 0.5, 0);
+  const NX = 13, NZ = 11;
+  for (let i = 0; i < NX; i++) for (let j = 0; j < NZ; j++) {
+    const xn = (i - (NX - 1) / 2) / ((NX - 1) / 2);           // -1..1 across
+    const zn = j / (NZ - 1);                                   // 0 land .. 1 sea
+    const x = xn * 26 + (r() - 0.5) * 0.8, z = -8 + zn * 18 + (r() - 0.5) * 0.6;
+    const peak = Math.pow(1 - Math.abs(xn), 1.15) * (0.45 + 0.55 * Math.sin(zn * Math.PI * 0.85 + 0.25));
+    const h = 4.55 + (34.25 - 4.55) * peak * (0.96 + r() * 0.04);
+    items.push({ x, z, h, w: 0.9 + r() * 0.7 });
+  }
+  const geo = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
   const mat = L(0xffffff);
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uNight = U.uNight; sh.uniforms.uTime = U.uTime;
@@ -97,42 +102,50 @@ function tamthang() {
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLed = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uNight, uTime;\nvarying vec3 vLed;')
       .replace('#include <map_fragment>', `
-        // ceramic mosaic: small tiles in white / sky blue / teal
-        vec2 tq = floor(vec2(vLed.x + vLed.z, vLed.y) / 0.35);
+        vec2 tq = floor(vec2(vLed.x + vLed.z, vLed.y) / 0.3);
         float hh = fract(sin(dot(tq, vec2(12.9898, 78.233))) * 43758.5453);
-        vec3 tile = hh < 0.55 ? vec3(0.95, 0.96, 0.97) : hh < 0.82 ? vec3(0.62, 0.8, 0.92) : vec3(0.36, 0.66, 0.74);
-        diffuseColor.rgb *= tile;`)
+        diffuseColor.rgb *= mix(vec3(0.97, 0.97, 0.96), vec3(0.86, 0.88, 0.9), step(0.7, hh));`)
       .replace('#include <emissivemap_fragment>', `
-        vec3 led = 0.5 + 0.5 * cos(6.2831 * (uTime * 0.08 + vLed.y * 0.025 + vec3(0.0, 0.33, 0.67)));
-        totalEmissiveRadiance += led * uNight * 0.9;`);
+        float pulse = 0.75 + 0.25 * sin(uTime * 1.3 + vLed.y * 0.15);
+        totalEmissiveRadiance += mix(vec3(0.85, 0.15, 0.75), vec3(0.55, 0.2, 1.0), 0.5 + 0.5 * sin(uTime * 0.4)) * uNight * pulse;`);
   };
   const inst = new THREE.InstancedMesh(geo, mat, items.length);
   const m4 = new THREE.Matrix4();
-  items.forEach((it, i) => inst.setMatrixAt(i, m4.makeScale(it.rad, it.h, it.rad).setPosition(it.x, 0.2, it.z)));
+  items.forEach((it, i) => inst.setMatrixAt(i, m4.makeScale(it.w, it.h, it.w).setPosition(it.x, 0.25, it.z)));
   inst.castShadow = true; g.add(inst);
-  g.userData.tick = jetTick;
+  // ground lights in the square
+  const dots = new THREE.InstancedMesh(new THREE.CircleGeometry(0.25, 8).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff }), 120);
+  for (let i = 0; i < 120; i++) dots.setMatrixAt(i, m4.makeTranslation(-60 + (i % 20) * 6.3, 0.27, -28 + Math.floor(i / 20) * 2.6));
+  g.add(dots);
+  g.userData.tick = () => { dots.visible = U.uNight.value > 0.3; };
   return g;
 }
 
-/** Cá Ông: red-copper whale, 8.8 m tall, rising out of a fountain pool in the old flag-pole square. */
+/**
+ * Cá Ông (photos: VnExpress/Dân trí 3/2/2026): a patina-green bronze humpback whale, 8.8 m tall, rising
+ * diagonally out of curling wave sculptures, in a round dark pool ringed with jets, on a blue-and-white
+ * checkered round square.
+ */
 function caong() {
   const g = new THREE.Group();
-  add(g, new THREE.CylinderGeometry(27, 27, 4, 48), L(0xd9d0c2), 0, -1.75, 0);
-  const pool = water(12.5); pool.position.y = 0.35; g.add(pool);
-  add(g, new THREE.TorusGeometry(12.5, 0.45, 6, 48), L(0xf1ebe0), 0, 0.35, 0, Math.PI / 2);
-  const copper = new THREE.MeshPhongMaterial({ color: 0xb4613a, specular: 0x7a4a30, shininess: 45 });
-  // breaching whale: tail in the water at the back, head high toward the sea
-  const spine = [[0, 0.6, -7.5], [0, 1.4, -5.6], [0, 3.0, -3.4], [0, 5.2, -1.2], [0, 7.2, 0.9], [0, 8.4, 2.4], [0, 8.8, 3.1]];
-  add(g, sweep(spine, [0.25, 0.7, 1.45, 1.75, 1.55, 1.0, 0.15], 18, 60, 0.85), copper, 0, 0, 0);
-  // tail flukes
-  for (const s of [-1, 1]) add(g, new THREE.SphereGeometry(1, 12, 8).scale(1.7, 0.18, 0.7), copper, s * 1.3, 0.55, -7.6, 0, s * 0.5, s * 0.25);
-  // pectoral fins
-  for (const s of [-1, 1]) add(g, new THREE.SphereGeometry(1, 12, 8).scale(1.9, 0.16, 0.55), copper, s * 1.9, 5.6, 0.2, 0.3, s * 0.4, s * -0.6);
-  // eyes
-  for (const s of [-1, 1]) add(g, new THREE.SphereGeometry(0.12, 8, 6), L(0x1d140f), s * 0.9, 7.9, 1.6);
-  const tick = fountainJets(g, 16, 10, 4.5, 0.35);
-  g.userData.tick = tick;
-  g.userData.lift = 0;
+  const sq = checker('#2f5d9a', '#eef0f2', 20);
+  sq.map && sq.map.repeat.set(3, 3);
+  add(g, new THREE.CylinderGeometry(27, 27, 4, 48), sq, 0, -1.75, 0);
+  add(g, new THREE.CylinderGeometry(12.6, 12.6, 0.55, 48), L(0x9aa3a8), 0, 0.27, 0);
+  const pool = new THREE.Mesh(new THREE.CircleGeometry(12, 48).rotateX(-Math.PI / 2), new THREE.MeshPhongMaterial({ color: 0x23343d, specular: 0x88aabb, shininess: 80 }));
+  pool.position.y = 0.5; g.add(pool);
+  const bronze = new THREE.MeshPhongMaterial({ color: 0x46766c, specular: 0x9cc7b8, shininess: 30 });
+  // curling wave base
+  add(g, new THREE.CylinderGeometry(3.6, 4.4, 2.2, 18), bronze, 0, 1.4, 0);
+  const curls = [[-2.2, 2.6, 1.2, 1.5, 0.6], [2.0, 2.4, 0.8, 1.3, -0.5], [0.2, 3.4, -1.4, 1.7, 2.6], [-1.0, 4.6, 0.6, 1.2, 1.2], [1.4, 3.9, 1.7, 1.0, -1.9]];
+  for (const [x, y, z, rad, ry] of curls) add(g, new THREE.TorusGeometry(rad, rad * 0.32, 8, 20, Math.PI * 1.55), bronze, x, y, z, 0, ry, 0.3);
+  // humpback rising diagonally: tail down in the waves, head up and forward
+  const spine = [[0, 2.0, -2.6], [0, 3.4, -1.8], [0, 5.0, -0.6], [0, 6.6, 0.8], [0, 7.9, 2.2], [0, 8.6, 3.4], [0, 8.8, 4.2]];
+  add(g, sweep(spine, [0.35, 1.0, 1.55, 1.7, 1.45, 0.95, 0.2], 18, 60, 0.82), bronze, 0, 0, 0);
+  for (const s of [-1, 1]) add(g, new THREE.SphereGeometry(1, 14, 8).scale(0.9, 0.12, 2.6), bronze, s * 1.9, 6.0, 1.6, -0.5, s * 0.55, s * 0.5);  // long pectoral fins
+  for (const s of [-1, 1]) add(g, new THREE.SphereGeometry(1, 12, 8).scale(1.6, 0.16, 0.6), bronze, s * 1.2, 2.0, -3.0, 0.2, s * 0.5, s * 0.3); // flukes in the waves
+  const jets = fountainJets(g, 28, 11, 1.8, 0.5);
+  g.userData.tick = jets;
   return g;
 }
 
