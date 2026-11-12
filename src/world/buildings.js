@@ -102,10 +102,34 @@ function unitBox() {
   return g;
 }
 
-/** All mapped buildings of the peninsula as instanced boxes with a procedural facade. */
-/** `clear`: [{x, z, r}] areas kept free of mapped buildings (landmark sites). */
-export function buildBuildings(i16, bpolys, route, clear = []) {
+/**
+ * Drops mapped buildings that no longer exist: landmark sites (`clear`: [{x, z, r}]) and the beach side of
+ * Thùy Vân / Quang Trung. Returns { rects: Int16Array, polys } used for both the 3D city and the ground map.
+ */
+export function filterBuildings(i16, bpolys, route, clear = []) {
   const blocked = (x, z) => clear.some((c) => (x - c.x) ** 2 + (z - c.z) ** 2 < c.r * c.r);
+  // Thùy Vân (Bãi Sau, rebuilt as a park in 2025) and Quang Trung (Bãi Trước park) have no buildings
+  // between the road and the sea; the map data still holds old kiosks there.
+  const f = {};
+  const onParkBeach = (x, z) => {
+    const pr = route.project(x, z);
+    if (pr.dist > 160) return false;
+    const name = route.sections[route.sectionIndex(pr.s)].name;
+    if (name !== 'Thùy Vân' && name !== 'Quang Trung') return false;
+    const fr = route.at(pr.s, f);
+    const lat = (x - fr.pos.x) * fr.right.x + (z - fr.pos.z) * fr.right.z;
+    return lat * route.seaSide > 0;
+  };
+  const keep = [];
+  for (let i = 0; i < i16.length / 8; i++) if (!blocked(i16[i * 8] / 4, i16[i * 8 + 1] / 4) && !onParkBeach(i16[i * 8] / 4, i16[i * 8 + 1] / 4)) keep.push(i);
+  const rects = new Int16Array(keep.length * 8);
+  keep.forEach((i, k) => rects.set(i16.subarray(i * 8, i * 8 + 8), k * 8));
+  const polys = bpolys.filter(([pts]) => !blocked(pts[0] / 10, pts[1] / 10) && !onParkBeach(pts[0] / 10, pts[1] / 10));
+  return { rects, polys };
+}
+
+/** All mapped buildings of the peninsula as instanced boxes with a procedural facade. */
+export function buildBuildings(i16, bpolys, route) {
   const group = new THREE.Group();
   group.name = 'buildings';
   const TILE = 420;
@@ -114,7 +138,6 @@ export function buildBuildings(i16, bpolys, route, clear = []) {
   const maxDist = quality.pick(700, 2600, 1e9);
   for (let i = 0; i < n; i++) {
     const cx = i16[i * 8] / 4, cz = i16[i * 8 + 1] / 4;
-    if (blocked(cx, cz)) continue;
     if (maxDist < 1e8 && route.project(cx, cz).dist > maxDist) continue;
     const key = Math.floor(cx / TILE) + ',' + Math.floor(cz / TILE);
     let t = tiles.get(key); if (!t) tiles.set(key, t = []);
@@ -148,7 +171,6 @@ export function buildBuildings(i16, bpolys, route, clear = []) {
   if (bpolys.length) {
     const pos = [], nrm = [], fuv = [], binfo = [], idx = [];
     for (const [pts, h10, b10, kind, seed] of bpolys) {
-      if (blocked(pts[0] / 10, pts[1] / 10)) continue;
       const h = h10 / 10, base = b10 / 10, sd = seed / 255, nP = pts.length / 2;
       const P = []; for (let i = 0; i < nP; i++) P.push(new THREE.Vector2(pts[i * 2] / 10, pts[i * 2 + 1] / 10));
       let acc = 0;

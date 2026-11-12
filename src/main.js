@@ -11,7 +11,7 @@ import { buildSea } from './world/sea.js';
 import { buildSky, Environment } from './world/sky.js';
 import { Route } from './world/route.js';
 import { buildRouteRoad } from './world/road.js';
-import { buildBuildings } from './world/buildings.js';
+import { buildBuildings, filterBuildings } from './world/buildings.js';
 import { buildForest, buildRoadsideTrees } from './world/vegetation.js';
 import { buildLandmarks } from './world/landmarks.js';
 import { buildCoastalLife } from './world/traffic.js';
@@ -72,11 +72,6 @@ async function boot() {
   let timeIdx = 0;
   env.setHour(parseFloat(params.get('t') || String(TIMES[0])));
 
-  const ground = buildGroundCanvas(world, terrain, bI16, quality.pick(2048, 4096, 4096));
-  scene.add(terrain.buildMesh(groundTexture(ground, renderer)));
-  scene.add(buildSea(terrain));
-  setLoad(0.5, 'Đang trải nhựa đường Trần Phú → Thùy Vân...'); await nextFrame();
-  scene.add(buildRouteRoad(route));
   // points of interest: world position + nearest spot on the route
   const pois = POIS.map((p) => {
     let [x, z] = ll2xz(p.lat, p.lon);
@@ -88,8 +83,14 @@ async function boot() {
     return { ...p, x, z, s: pr.s, y: terrain.heightAt(x, z) };
   }).sort((a, b) => a.s - b.s);
   const clear = pois.filter((p) => p.clear).map((p) => ({ x: p.x, z: p.z, r: p.clear }));
-  setLoad(0.62, 'Đang xây ' + (bI16.length / 8).toLocaleString('vi') + ' ngôi nhà...'); await nextFrame();
-  scene.add(buildBuildings(bI16, world.bpolys, route, clear));
+  const built = filterBuildings(bI16, world.bpolys, route, clear);
+  const ground = buildGroundCanvas(world, terrain, built.rects, quality.pick(2048, 4096, 4096));
+  scene.add(terrain.buildMesh(groundTexture(ground, renderer)));
+  scene.add(buildSea(terrain));
+  setLoad(0.5, 'Đang trải nhựa đường Trần Phú → Thùy Vân...'); await nextFrame();
+  scene.add(buildRouteRoad(route));
+  setLoad(0.62, 'Đang xây ' + (built.rects.length / 8).toLocaleString('vi') + ' ngôi nhà...'); await nextFrame();
+  scene.add(buildBuildings(built.rects, built.polys, route));
   setLoad(0.8, 'Đang trồng dừa, lắp đèn đường & giao thông...'); await nextFrame();
   scene.add(buildForest(terrain, route));
   scene.add(buildRoadsideTrees(route, terrain));

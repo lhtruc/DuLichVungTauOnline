@@ -76,16 +76,16 @@ function tamthang() {
   for (let k = 0; k < 6; k++) add(g, new THREE.BoxGeometry(4, 0.6, 1.2), pave, 0, 0.3 + k * 0.6, 18.4 + k * 0.9 - 6);
 
   // pillars: three rows (Thắng Nhất, Thắng Nhì, Thắng Tam) converging toward the sea
-  const ROWS = [{ x: -5.5, hmax: 30.8 }, { x: 0, hmax: 34.25 }, { x: 5.5, hmax: 27.6 }];
+  const ROWS = [{ x: -10, hmax: 30.8 }, { x: 0, hmax: 34.25 }, { x: 10, hmax: 27.6 }];
   const items = [];
   const perRow = [48, 48, 47];
   ROWS.forEach((row, ri) => {
     for (let i = 0; i < perRow[ri]; i++) {
       const t = i / (perRow[ri] - 1);
       const z = -20 + t * 38;
-      const x = row.x * (1 - t * 0.55) + (r() - 0.5) * 3.2 * (1 - t * 0.5);
+      const x = row.x * (1 - t * 0.45) + (r() - 0.5) * 6.5 * (1 - t * 0.6);
       const h = 4.55 + (row.hmax - 4.55) * Math.pow(t, 1.7) * (0.9 + r() * 0.1);
-      const rad = 0.4 + r() * 0.8;
+      const rad = 0.5 + r() * 0.9;
       items.push({ x, z: z + (r() - 0.5) * 1.2, h: i === perRow[ri] - 1 ? row.hmax : h, rad });
     }
   });
@@ -301,26 +301,15 @@ function baiDau() {
   return g;
 }
 
-/** Sloped lookout approach at Mũi Nghinh Phong, with low roadside rails. */
+/** Lookout on Dốc Hoàng Hôn: a small railed deck on the hillside facing the sunset; the slope itself is the terrain. */
 function sunsetSlope() {
   const g = new THREE.Group(); g.name = 'doc-hoang-hon-nghinh-phong';
-  const road = new THREE.MeshLambertMaterial({ color: 0x55585b });
-  const rail = new THREE.MeshLambertMaterial({ color: 0xe7e1d5 });
-  const red = new THREE.MeshLambertMaterial({ color: 0xb74b3c });
-  const vertices = new Float32Array([-9, -1, -24, 9, -1, -24, -9, 3.5, 24, 9, 3.5, 24]);
-  const rampGeometry = new THREE.BufferGeometry();
-  rampGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-  rampGeometry.setIndex([0, 2, 1, 1, 2, 3]); rampGeometry.computeVertexNormals();
-  const ramp = new THREE.Mesh(rampGeometry, road); ramp.name = 'sloped road'; ramp.receiveShadow = true; g.add(ramp);
-  for (const side of [-1, 1]) {
-    for (let i = 0; i <= 6; i++) {
-      const z = -22 + i * 7.3, y = -0.8 + (z + 24) * 4.5 / 48;
-      add(g, new THREE.BoxGeometry(0.45, 2.2, 0.45), rail, side * 10.2, y + 1, z);
-    }
-    const beam = add(g, new THREE.BoxGeometry(0.35, 0.45, 48), rail, side * 10.2, 2.6, 0);
-    beam.rotation.x = -0.094;
-    for (let i = 0; i < 5; i++) add(g, new THREE.BoxGeometry(0.5, 1.2, 0.45), red, side * 10.2, 0.5 + i * 0.48, -18 + i * 9);
-  }
+  const deck = L(0xcfc4b2), rail = L(0xf2eee6), red = L(0xb74b3c);
+  add(g, new THREE.BoxGeometry(10, 3, 6), deck, 0, -0.9, 0);
+  for (let i = -4; i <= 4; i++) add(g, new THREE.BoxGeometry(0.16, 1.1, 0.16), rail, i * 1.2, 1.15, 2.9);
+  add(g, new THREE.BoxGeometry(10, 0.14, 0.14), rail, 0, 1.7, 2.9);
+  for (const s of [-1, 1]) add(g, new THREE.BoxGeometry(0.14, 0.14, 5.8), rail, s * 4.95, 1.7, 0);
+  add(g, new THREE.BoxGeometry(2.6, 0.12, 0.6), red, 0, 1.0, 1.2);   // bench
   return g;
 }
 

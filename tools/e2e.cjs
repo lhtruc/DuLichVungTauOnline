@@ -68,7 +68,10 @@ const check = (ok, msg) => { log(ok ? '  ok  ' : ' FAIL ', msg); if (!ok) errors
 
   log('4. progress bar click');
   const bar = await (await p.$('#bar')).boundingBox();
-  await p.mouse.click(bar.x + bar.width * 0.8, bar.y + bar.height / 2);
+  // click at ~80 %, nudged away from the POI ticks (those jump to the landmark instead)
+  const ticks = await app(() => window.__app.pois.map((q) => q.s / window.__app.route.length));
+  let pct = 0.8; while (ticks.some((t) => Math.abs(t - pct) < 0.012)) pct += 0.006;
+  await p.mouse.click(bar.x + bar.width * pct, bar.y + bar.height / 2);
   await until(() => window.__app.rider.s / window.__app.route.length > 0.7, 15000);
   const f = await app(() => window.__app.rider.s / window.__app.route.length);
   check(f > 0.7 && f < 0.9, `bar click jumps to ~80% (got ${(f * 100).toFixed(0)}%)`);
