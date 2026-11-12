@@ -27,7 +27,7 @@ export const POIS = [
     facts: ['Tượng Đức Mẹ cao ~32 m', 'Trung tâm hành hương lớn của giáo phận Bà Rịa', 'Bãi Dâu: bãi tắm kín gió, nước êm'],
   },
   {
-    id: 'baidau', name: 'Bãi Dâu', icon: '🏖️', lat: 10.3686, lon: 107.0613, model: null,
+    id: 'baidau', name: 'Bãi Dâu', icon: '🏖️', lat: 10.3686, lon: 107.0613, model: 'baidau', labelHeight: 10,
     tag: 'Bãi biển', view: [240, 140, 45],
     text: 'Bãi biển nhỏ dài chừng 3 km nép dưới chân Núi Lớn, xưa kia mọc nhiều cây dâu rừng nên thành tên. Nhờ núi chắn gió, biển ở đây lặng sóng quanh năm — lý tưởng để ngắm hoàng hôn.',
     facts: ['Còn gọi là bãi Phương Thảo', 'Kín gió, sóng êm', 'Nhiều quán hải sản ven đường Trần Phú'],
@@ -45,7 +45,7 @@ export const POIS = [
     facts: ['Tuyến cáp dài ~500 m', 'Đỉnh Núi Lớn (núi Tương Kỳ) cao 245 m', 'Tượng Phật Di Lặc cao ~30 m trên đỉnh'],
   },
   {
-    id: 'baitruoc', name: 'Bãi Trước', icon: '🌅', lat: 10.3440, lon: 107.0738, model: 'baitruoc',
+    id: 'baitruoc', name: 'Bãi Trước', icon: '🌅', lat: 10.3440, lon: 107.0738, model: 'baitruoc', labelHeight: 14,
     tag: 'Bãi biển · Trung tâm', view: [240, 190, 70],
     text: 'Bãi Trước — xưa gọi là bãi Tầm Dương, "tìm mặt trời" — nằm giữa Núi Lớn và Núi Nhỏ như một vầng trăng khuyết. Công viên rợp dừa chạy dọc đường Quang Trung, ngoài vịnh là hàng trăm ghe thuyền neo đậu. Đây là nơi ngắm hoàng hôn đẹp nhất thành phố.',
     facts: ['Tên cũ: Vịnh Hàng Dừa (Baie des Cocotiers)', 'Mặt trời lặn thẳng xuống biển', 'Công viên Bãi Trước & tượng đài'],
@@ -87,7 +87,7 @@ export const POIS = [
     facts: ['Cao 32 m · sải tay 18,4 m', 'Hơn 800 bậc thang lên đỉnh', 'Một trong những tượng Chúa lớn nhất châu Á'],
   },
   {
-    id: 'honba', name: 'Hòn Bà', icon: '🏝️', lat: 10.32393, lon: 107.08923, model: 'honba',
+    id: 'honba', name: 'Miếu Hòn Bà', icon: '🏝️', lat: 10.32393, lon: 107.08923, model: 'honba', labelHeight: 16,
     tag: 'Đảo nhỏ · Miếu', view: [320, 150, 40],
     text: 'Hòn đảo nhỏ cách bờ Bãi Sau chừng 200 m, trên đảo có Miếu Hòn Bà xây từ năm 1781. Mỗi tháng đôi lần khi triều rút thấp, một lối đá lộ ra giữa biển để người ta đi bộ ra đảo thắp hương.',
     facts: ['Miếu xây năm 1781', 'Đi bộ ra đảo khi triều rút', 'Người Pháp gọi là "Archinard"'],
@@ -99,16 +99,22 @@ export const POIS = [
     facts: ['Điểm đầu đường Thùy Vân', 'Chân núi Tao Phùng (Núi Nhỏ)', 'Gần Đồi Con Heo — điểm ngắm bình minh'],
   },
   {
-    id: 'baisau', name: 'Bãi Sau – Thùy Vân', icon: '🏝️', lat: 10.3420, lon: 107.0952, model: 'beach',
+    id: 'baisau', name: 'Công viên Bãi Sau – Thùy Vân', icon: '🏝️', lat: 10.3420, lon: 107.0952, model: 'baisau', labelHeight: 14,
     tag: 'Bãi tắm chính', view: [120, 170, 60],
-    text: 'Bãi Thùy Vân — Bãi Sau — chạy dài gần 10 km từ chân Núi Nhỏ tới Cửa Lấp, cát mịn thoai thoải, sóng lớn vào mùa gió chướng. Dọc đường Thùy Vân là khách sạn, quán hải sản và công viên biển vừa được chỉnh trang.',
-    facts: ['Dài gần 10 km', 'Bình minh mọc thẳng từ biển', 'Mùa gió bắc: thiên đường lướt ván diều'],
+    text: 'Bãi Thùy Vân — Bãi Sau — chạy dài gần 10 km từ chân Núi Nhỏ tới Cửa Lấp, cát mịn thoai thoải, sóng lớn vào mùa gió chướng. Dọc đường Thùy Vân là công viên biển với lối dạo, thảm cỏ và hàng cây mở ra sát bờ biển.',
+    facts: ['Bãi biển dài gần 10 km', 'Công viên ven biển Thùy Vân vừa được chỉnh trang', 'Bình minh mọc thẳng từ biển'],
   },
   {
     id: 'tamthang', name: 'Tháp Tam Thắng', icon: '🗽', lat: 10.34878, lon: 107.09600, model: 'tamthang',
     tag: 'Quảng trường biển', view: [125, 110, 35],
     text: 'Biểu tượng mới của Bãi Sau: tháp Tam Thắng giữa quảng trường biển, gợi hình cánh buồm và ba làng Thắng Nhất – Thắng Nhì – Thắng Tam, những ngôi làng đầu tiên lập nên Vũng Tàu từ thời vua Gia Long.',
-    facts: ['Khánh thành 2023', 'Tam Thắng: ba làng khai sinh Vũng Tàu', 'Công viên Thùy Vân chỉnh trang dài ~3 km'],
+    facts: ['143 trụ cao dần tới khoảng 34 m', 'Tạo hình gợi ba mũi thuyền', 'Gắn với ba làng Thắng Nhất – Thắng Nhì – Thắng Tam'],
+  },
+  {
+    id: 'docnghinhphong', name: 'Dốc Hoàng Hôn – Mũi Nghinh Phong', icon: '🌇', lat: 10.32295, lon: 107.0833, model: 'hoanghon', labelHeight: 9,
+    tag: 'Đường dốc · Điểm ngắm biển', view: [270, 55, 15],
+    text: 'Đoạn dốc ven biển gần lối lên Mũi Nghinh Phong, nơi đường men theo sườn Núi Nhỏ mở ra tầm nhìn rộng về phía biển và ánh chiều. Dừng xe ở điểm ngắm cảnh để nhìn lại cung đường và bờ biển quanh mũi.',
+    facts: ['Gần lối lên Mũi Nghinh Phong', 'Đường dốc ven sườn núi, hướng nhìn ra biển', 'Có thể ghé cùng điểm Cổng Trời'],
   },
   {
     id: 'finish', name: 'Cuối đường Thùy Vân', icon: '🏁', lat: 10.3537, lon: 107.1031, model: 'gate',

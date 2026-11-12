@@ -7,7 +7,7 @@ Chạy xe máy dọc **16,3 km** cung đường ven biển đẹp nhất Vũng T
 ## Điểm nổi bật
 
 - **Bản đồ thực 3D:** Địa hình Núi Lớn & Núi Nhỏ từ lưới độ cao DEM (Terrarium tiles), đường bờ biển, bãi cát, công viên, mạng lưới đường phố và **hơn 46.000 tòa nhà** từ Overture Maps / OpenStreetMap.
-- **17 địa danh & Thuyết minh giọng nói (Audio Guide):** Thích Ca Phật Đài, Bến Đá – Sao Mai, Tượng Quan Âm Bãi Dâu, Đức Mẹ Bãi Dâu, Bạch Dinh, Cáp treo Hồ Mây, Bãi Trước, Bến tàu Cầu Đá, Hải đăng Vũng Tàu, Niết Bàn Tịnh Xá, Bãi Dứa, Mũi Nghinh Phong, Tượng Chúa Kitô Vua, Hòn Bà, Cột cờ Bãi Sau, Bãi Sau Thùy Vân — có nút nghe thuyết minh tiếng Việt trực tiếp và mở Google Street View.
+- **18 địa danh & Thuyết minh giọng nói (Audio Guide):** Thích Ca Phật Đài, Bến Đá – Sao Mai, Tượng Quan Âm Bãi Dâu, Đức Mẹ Bãi Dâu, Bãi Dâu, Bạch Dinh, Cáp treo Hồ Mây, Công viên Bãi Trước, Bến tàu Cầu Đá, Hải đăng Vũng Tàu, Niết Bàn Tịnh Xá, Bãi Dứa, Mũi Nghinh Phong, Dốc Hoàng Hôn, Tượng Chúa Kitô Vua, Miếu Hòn Bà, Cột cờ Bãi Sau, Công viên Bãi Sau và Tháp Tam Thắng — có nút nghe thuyết minh tiếng Việt trực tiếp và mở Google Street View.
 - **Đời sống ven biển sống động:** Phương tiện giao thông AI (xe máy, ô tô chạy hai chiều dọc cung đường), hệ thống đèn đường tự động thắp sáng khi hoàng hôn/ban đêm, tàu thuyền đánh cá dập dềnh ngoài vịnh.
 - **Âm thanh Procedural (Web Audio API):** Tiếng động cơ xe tay ga biến thiên theo tốc độ ga, tiếng còi xe đôi, tiếng sóng biển vỗ bờ và gió biển mà không cần tải file âm thanh nặng.
 - **Minimap 2D tương tác & Chụp ảnh bưu thiếp:** Bản đồ thu nhỏ góc dưới trái hiển thị vị trí, hướng nhìn và cho phép chạm để dịch chuyển nhanh; nút chụp ảnh lưu ngay bưu thiếp Vũng Tàu kèm tọa độ km.

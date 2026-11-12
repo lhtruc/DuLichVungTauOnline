@@ -288,7 +288,7 @@ async function boot() {
     // floating labels
     pois.forEach((p, i) => {
       const el = labels[i];
-      v3.set(p.x, p.y + (p.model ? 40 : 14), p.z);
+      v3.set(p.x, p.y + (p.labelHeight ?? (p.model ? 40 : 14)), p.z);
       const dist = v3.distanceTo(camera.position);
       v3.project(camera);
       if (v3.z > 1 || dist > 2600 || Math.abs(v3.x) > 1.1 || Math.abs(v3.y) > 1.1) { el.style.display = 'none'; return; }

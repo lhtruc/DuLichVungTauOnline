@@ -46,6 +46,174 @@ function statue(h, color = 0xf4f2ec) {
   return g;
 }
 
+/** Palm silhouette used around the two promenades. */
+function palm(g, x, z, scale = 1, materials) {
+  add(g, new THREE.CylinderGeometry(0.28 * scale, 0.52 * scale, 7.5 * scale, 7), materials.trunk, x, 3.75 * scale, z);
+  const crownY = 7.25 * scale;
+  for (let i = 0; i < 6; i++) {
+    const leaf = add(g, new THREE.SphereGeometry(1, 7, 5), materials.leaf, x, crownY, z);
+    leaf.scale.set(0.62 * scale, 0.18 * scale, 2.2 * scale);
+    leaf.rotation.y = i * Math.PI / 3;
+    leaf.rotation.x = -0.16;
+  }
+}
+
+/** Low-profile planted promenade segment, aligned along its long axis. */
+function coastalPark(width, depth, palmCount, name) {
+  const g = new THREE.Group(); g.name = name;
+  const materials = {
+    grass: new THREE.MeshLambertMaterial({ color: 0x67964f }),
+    path: new THREE.MeshLambertMaterial({ color: 0xc9bca2 }),
+    redPath: new THREE.MeshLambertMaterial({ color: 0xa96d58 }),
+    trunk: new THREE.MeshLambertMaterial({ color: 0x76583b }),
+    leaf: new THREE.MeshLambertMaterial({ color: 0x397346 }),
+    stone: new THREE.MeshLambertMaterial({ color: 0xaaa79e }),
+    bench: new THREE.MeshLambertMaterial({ color: 0x765d45 }),
+  };
+  // buildLandmarks anchors groups half a metre below sampled terrain; lift surfaces above that offset.
+  add(g, new THREE.BoxGeometry(width, 0.32, depth), materials.grass, 0, 0.4, 0);
+  add(g, new THREE.BoxGeometry(width * 0.96, 0.16, 9), materials.path, 0, 0.64, -depth * 0.28);
+  add(g, new THREE.BoxGeometry(width * 0.88, 0.14, 6), materials.redPath, 0, 0.65, depth * 0.25);
+  add(g, new THREE.BoxGeometry(width, 0.7, 1.5), materials.stone, 0, 0.2, -depth * 0.49);
+  for (let i = 0; i < palmCount; i++) {
+    const x = -width * 0.44 + i * (width * 0.88 / Math.max(1, palmCount - 1));
+    palm(g, x, (i % 2 ? 1 : -1) * depth * 0.39, 0.92, materials);
+  }
+  for (const x of [-width * 0.28, 0, width * 0.28]) {
+    add(g, new THREE.BoxGeometry(4.2, 0.32, 1), materials.bench, x, 1.0, depth * 0.02);
+    for (const dx of [-1.5, 1.5]) add(g, new THREE.BoxGeometry(0.25, 0.8, 0.3), materials.stone, x + dx, 0.62, depth * 0.02);
+  }
+  g.rotation.y = Math.PI / 4;
+  return g;
+}
+
+/** Tam Thắng's three rising prow forms, represented by 143 shared-mesh columns. */
+function tamThang() {
+  const g = new THREE.Group(); g.name = 'tam-thang-tower';
+  const plaza = new THREE.MeshLambertMaterial({ color: 0xb8b3a8 });
+  add(g, new THREE.BoxGeometry(128, 0.8, 88), plaza, 0, 0.2, 0);
+  const columnGeometry = new THREE.CylinderGeometry(1.35, 1.75, 1, 6);
+  const columnMaterial = new THREE.MeshLambertMaterial({ color: 0xf3eee2 });
+  const rowWidths = [4, 5, 6, 7, 7, 7, 6, 6]; // 48 columns per prow
+  const total = 143;
+  const columns = new THREE.InstancedMesh(columnGeometry, columnMaterial, total);
+  columns.name = '143 mosaic pillars'; columns.castShadow = true; columns.receiveShadow = true;
+  const tones = [0xf3eee2, 0xd9c59c, 0xe7dfd4, 0xfaf7ed];
+  const dummy = new THREE.Object3D();
+  let index = 0;
+  for (let prow = 0; prow < 3; prow++) {
+    for (let row = 0; row < rowWidths.length; row++) {
+      const count = rowWidths[row] - (prow === 2 && row === 7 ? 1 : 0);
+      for (let col = 0; col < count; col++) {
+        const center = (count - 1) / 2;
+        const height = 5.2 + row * 3.9 + ((col + prow) % 3) * 0.25;
+        const x = (prow - 1) * 39 + (col - center) * 3.15;
+        const z = (row - 3.5) * 6.3 + Math.abs(col - center) * 0.35;
+        dummy.position.set(x, 0.6 + height / 2, z);
+        dummy.scale.set(1, height, 1); dummy.updateMatrix();
+        columns.setMatrixAt(index, dummy.matrix);
+        columns.setColorAt(index, new THREE.Color(tones[(index * 7 + prow) % tones.length]));
+        index++;
+      }
+    }
+  }
+  columns.instanceMatrix.needsUpdate = true;
+  if (columns.instanceColor) columns.instanceColor.needsUpdate = true;
+  g.add(columns);
+  return g;
+}
+
+/** Small yellow shrine and red tiled roofs on Hòn Bà's rocky islet. */
+function honBa() {
+  const g = new THREE.Group(); g.name = 'mieu-hon-ba';
+  const rock = new THREE.MeshLambertMaterial({ color: 0x77736a });
+  const yellow = new THREE.MeshLambertMaterial({ color: 0xe3ba4f });
+  const red = new THREE.MeshLambertMaterial({ color: 0x9b3930 });
+  const wood = new THREE.MeshLambertMaterial({ color: 0x75452e });
+  add(g, new THREE.CylinderGeometry(18, 22, 4, 9), rock, 0, 2, 0);
+  add(g, new THREE.BoxGeometry(14, 5, 10), yellow, 0, 6.5, 0);
+  add(g, new THREE.BoxGeometry(10, 3.5, 0.5), wood, 0, 6.1, 5.15);
+  for (const sx of [-3.4, 3.4]) {
+    const roof = add(g, new THREE.BoxGeometry(8.3, 0.8, 12), red, sx, 9.35, 0);
+    roof.rotation.z = sx < 0 ? -0.42 : 0.42;
+  }
+  add(g, new THREE.BoxGeometry(1.5, 1, 12.4), red, 0, 11.0, 0);
+  add(g, new THREE.BoxGeometry(20, 0.9, 2), red, 0, 10.1, 0);
+  // Gate at the islet approach: three gold posts and a red sign beam.
+  for (const x of [-7, 0, 7]) add(g, new THREE.CylinderGeometry(0.42, 0.55, 6, 8), yellow, x, 3.1, 13);
+  add(g, new THREE.BoxGeometry(16, 1.4, 1.2), red, 0, 6.2, 13);
+  add(g, new THREE.BoxGeometry(10, 0.45, 8), rock, 0, 4.2, 8);
+  return g;
+}
+
+/** Rocky, sheltered Bãi Dâu shoreline with a narrow sand apron. */
+function baiDau() {
+  const g = new THREE.Group(); g.name = 'bai-dau-shore';
+  const sand = new THREE.MeshLambertMaterial({ color: 0xe0ce9b });
+  const rock = new THREE.MeshLambertMaterial({ color: 0x77766e });
+  const green = new THREE.MeshLambertMaterial({ color: 0x4f7545 });
+  const apron = add(g, new THREE.SphereGeometry(1, 18, 10), sand, 0, 0.15, 4);
+  apron.scale.set(62, 0.7, 22);
+  for (let i = 0; i < 12; i++) {
+    const angle = Math.PI * (0.12 + i * 0.76 / 11);
+    const x = Math.cos(angle) * 54, z = -Math.sin(angle) * 19 - 5;
+    const boulder = add(g, new THREE.DodecahedronGeometry(1, 0), rock, x, 0.8 + (i % 3) * 0.35, z);
+    boulder.scale.set(2.2 + (i % 2), 1.3 + (i % 3) * 0.25, 1.8);
+    if (i % 3 === 0) {
+      const shrub = add(g, new THREE.SphereGeometry(1.7, 7, 5), green, x * 0.72, 2.1, z - 3);
+      shrub.scale.set(1.5, 1, 1.4);
+    }
+  }
+  return g;
+}
+
+/** Mary holding the child Jesus, sized to the Bãi Dâu monument. */
+function virginMary() {
+  const g = new THREE.Group(), white = new THREE.MeshLambertMaterial({ color: 0xf5f3ed });
+  const base = new THREE.MeshLambertMaterial({ color: 0xd5cfc2 });
+  add(g, new THREE.CylinderGeometry(5.8, 6.5, 3.2, 12), base, 0, 1.6, 0);
+  const robe = new THREE.LatheGeometry([[0, 0], [5.2, 0], [4.2, 5], [3.4, 12], [2.9, 18], [2.2, 21], [0, 21]].map(([x, y]) => new THREE.Vector2(x, y)), 16);
+  add(g, robe, white, 0, 3, 0);
+  const veil = add(g, new THREE.SphereGeometry(2.6, 12, 10), white, 0, 25.2, -0.25);
+  veil.scale.set(1.12, 1.2, 0.72);
+  const head = add(g, new THREE.SphereGeometry(1.65, 12, 10), white, 0, 25.4, 0.95);
+  head.scale.set(0.92, 1.12, 0.86);
+  // Child held on Mary's left side; the swaddling is separate from the head.
+  const bundle = add(g, new THREE.SphereGeometry(1, 10, 8), white, -2.5, 19.2, 1.65);
+  bundle.scale.set(1.05, 2.45, 1.0);
+  add(g, new THREE.SphereGeometry(0.92, 10, 8), white, -2.5, 22.0, 1.7);
+  for (const side of [-1, 1]) {
+    const arm = add(g, new THREE.CylinderGeometry(0.62, 0.82, 7.3, 10), white, side * 2.15, 19.0, 1.45, 0, 0, side < 0 ? -0.7 : 0.35);
+    arm.rotation.x = 0.18;
+  }
+  g.rotation.y = -0.35;
+  g.scale.setScalar(1.15);
+  return g;
+}
+
+/** Sloped lookout approach at Mũi Nghinh Phong, with low roadside rails. */
+function sunsetSlope() {
+  const g = new THREE.Group(); g.name = 'doc-hoang-hon-nghinh-phong';
+  const road = new THREE.MeshLambertMaterial({ color: 0x55585b });
+  const rail = new THREE.MeshLambertMaterial({ color: 0xe7e1d5 });
+  const red = new THREE.MeshLambertMaterial({ color: 0xb74b3c });
+  const vertices = new Float32Array([-9, -1, -24, 9, -1, -24, -9, 3.5, 24, 9, 3.5, 24]);
+  const rampGeometry = new THREE.BufferGeometry();
+  rampGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+  rampGeometry.setIndex([0, 2, 1, 1, 2, 3]); rampGeometry.computeVertexNormals();
+  const ramp = new THREE.Mesh(rampGeometry, road); ramp.name = 'sloped road'; ramp.receiveShadow = true; g.add(ramp);
+  for (const side of [-1, 1]) {
+    for (let i = 0; i <= 6; i++) {
+      const z = -22 + i * 7.3, y = -0.8 + (z + 24) * 4.5 / 48;
+      add(g, new THREE.BoxGeometry(0.45, 2.2, 0.45), rail, side * 10.2, y + 1, z);
+    }
+    const beam = add(g, new THREE.BoxGeometry(0.35, 0.45, 48), rail, side * 10.2, 2.6, 0);
+    beam.rotation.x = -0.094;
+    for (let i = 0; i < 5; i++) add(g, new THREE.BoxGeometry(0.5, 1.2, 0.45), red, side * 10.2, 0.5 + i * 0.48, -18 + i * 9);
+  }
+  return g;
+}
+
 function flagpole() {
   const g = new THREE.Group();
   add(g, new THREE.CylinderGeometry(5, 6, 1.2, 8), new THREE.MeshLambertMaterial({ color: 0xcfc8ba }), 0, 0.6, 0);
@@ -65,7 +233,13 @@ function flagpole() {
 
 const BUILDERS = {
   christ, lighthouse, flag: flagpole,
-  ducme: () => statue(32), quanam: () => statue(16), thichca: () => statue(11),
+  ducme: virginMary, quanam: () => statue(16), thichca: () => statue(11),
+  tamthang: tamThang,
+  baisau: () => coastalPark(300, 82, 11, 'bai-sau-park'),
+  baitruoc: () => coastalPark(158, 58, 7, 'bai-truoc-park'),
+  honba: honBa,
+  baidau: baiDau,
+  hoanghon: sunsetSlope,
 };
 
 /** Places landmark models at their real coordinates; returns { group, ticks }. */
