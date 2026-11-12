@@ -48,6 +48,10 @@ def nm(x):
     return x.get("primary") if isinstance(x, dict) else None
 
 
+def clean(v):
+    return v if isinstance(v, str) else None
+
+
 def load(name):
     df = pq.read_table(f"data_raw/{name}.parquet").to_pandas()
     if "names" in df:
@@ -597,12 +601,12 @@ beaches = []
 for _, r in land[land["class"] == "beach"].iterrows():
     if r["geom"].geom_type in ("Polygon", "MultiPolygon") and r["geom"].intersects(REGION_BOX):
         for f in poly_out(r["geom"], 2.5):
-            beaches.append({"name": r["name"], "pts": f})
+            beaches.append({"name": clean(r["name"]), "pts": f})
 parks = []
 for _, r in land_use[land_use["class"].isin(["park", "garden", "pedestrian"])].iterrows():
     if r["geom"].geom_type in ("Polygon", "MultiPolygon") and r["geom"].intersects(REGION_BOX):
         for f in poly_out(r["geom"], 1.5):
-            parks.append({"name": r["name"], "cls": r["class"], "pts": f})
+            parks.append({"name": clean(r["name"]), "cls": r["class"], "pts": f})
 infra = load("infrastructure")
 piers = []
 for _, r in infra[infra["class"] == "pier"].iterrows():
@@ -653,7 +657,7 @@ world = {
     "waters": waters,
     "rocks": rocks,
 }
-json.dump(world, open(f"{OUT}/world.json", "w"), ensure_ascii=False, separators=(",", ":"))
+json.dump(world, open(f"{OUT}/world.json", "w"), ensure_ascii=False, separators=(",", ":"), allow_nan=False)
 for f in os.listdir(OUT):
     print(f"  {f}: {os.path.getsize(os.path.join(OUT, f)) / 1024:.0f} KB")
 
